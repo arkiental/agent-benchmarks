@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.server.json",
+  "compilerOptions": { "outDir": ".local/testbuild" },
+  "include": ["server", "shared", "scripts", "tests/*.test.ts", "tests/browser-server.ts"]
+}
