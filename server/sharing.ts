@@ -1,11 +1,11 @@
 import type { Config } from './config.js';
 import type { Post } from '../shared/schema.js';
-import { duration } from '../shared/schema.js';
+import { duration, providerLabel } from '../shared/schema.js';
 
 const escape = (value: string) => value.replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]!));
 export function shareDescription(post: Post) {
   const runs = post.runs.slice(0,3).map(run => [
-    run.model, run.reasoningEffort ? `Reasoning: ${run.reasoningEffort}` : '',
+    [providerLabel(run), run.model].filter(Boolean).join(' / '), run.reasoningEffort ? `Reasoning: ${run.reasoningEffort}` : '',
     run.elapsedSeconds !== null ? duration(run.elapsedSeconds) : '',
     run.tokens != null ? `${run.tokens.toLocaleString('en-US')} tokens` : '',
     run.estimatedCostUsd != null ? `Estimated $${run.estimatedCostUsd.toFixed(4).replace(/0+$/,'').replace(/\.$/,'')}` : '',

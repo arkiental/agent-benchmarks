@@ -1,0 +1,116 @@
+.comparison-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 12px;
+  margin: 0 0 38px;
+}
+.comparison-tabs > a {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 64px;
+  max-width: 100%;
+  padding: 14px 20px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.comparison-tabs > a[aria-current="page"] {
+  border-color: #fff;
+  background: var(--surface);
+  color: #fff;
+}
+.comparison-tabs > a:hover { border-color: #fff; color: #fff; }
+.comparison-tab-model { font-size: 20px; font-weight: 560; }
+.comparison-tab-provider { font-size: 17px; }
+.comparison-tabs > .group-compare-link {
+  align-items: center;
+  margin-left: auto;
+  font-size: 17px;
+  color: #fff;
+}
+.references-section { margin-top: 38px; }
+.reference-list {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 30px 32px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.reference-item { position: relative; min-width: 0; padding-left: 34px; }
+.reference-number { position: absolute; top: 8px; left: 0; font-size: 18px; color: var(--muted); }
+.reference-preview { position: relative; }
+.reference-preview img { width: 100%; aspect-ratio: 3/2; object-fit: contain; }
+.reference-item .reference-preview .media-gallery { display: block; margin-top: 0; }
+.reference-preview figcaption { display: none; }
+.reference-caption { display: flex; gap: 16px; align-items: start; justify-content: space-between; margin-top: 14px; }
+.reference-caption > span { min-width: 0; overflow-wrap: anywhere; }
+.reference-caption > a { display: inline-flex; align-items: center; min-height: 44px; flex-shrink: 0; margin-top: -10px; }
+.reference-link-content { display: grid; gap: 12px; padding: 12px 0 20px; }
+.reference-link-content > a { display: inline-block; overflow-wrap: anywhere; font-size: 22px; line-height: 1.4; }
+.reference-url { color: var(--muted); overflow-wrap: anywhere; font-size: 17px; }
+.reference-bundle { white-space: normal; text-align: center; }
+.group-post-picker { display: flex; flex-wrap: wrap; gap: 14px; padding: 0; margin: 32px 0; border: 0; }
+.group-post-picker > legend { padding: 0; margin-bottom: 18px; font-size: 22px; }
+.group-post-choice { display: flex; flex-direction: row; gap: 14px; align-items: center; border: 1px solid var(--line); padding: 14px 18px; min-height: 68px; max-width: 100%; }
+.group-post-choice:has(input:checked) { border-color: #fff; background: var(--surface); }
+.group-post-choice:has(input:disabled) { color: var(--muted); }
+.group-post-choice > span { display: grid; gap: 7px; min-width: 0; overflow-wrap: anywhere; }
+.group-post-choice strong { font-size: 20px; font-weight: 560; }
+.group-post-choice small { font-size: 17px; font-weight: 400; color: var(--muted); }
+.post-comparison-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: 32px; align-items: start; }
+.post-comparison-panel { min-width: 0; padding-top: 24px; border-top: 1px solid var(--line); }
+.post-comparison-heading { margin-bottom: 24px; }
+.post-comparison-heading h2 { font-size: 30px; margin-bottom: 14px; }
+.post-comparison-heading > p { color: var(--muted); margin-bottom: 16px; overflow-wrap: anywhere; }
+.post-comparison-heading > a { display: inline-flex; align-items: center; min-height: 44px; }
+.post-comparison-panel .cover-image img { max-height: 420px; }
+.post-comparison-panel .detail-section { margin-top: 36px; }
+.post-comparison-panel .detail-section h2 { font-size: 24px; }
+.post-comparison-panel .detail-section h3 { font-size: 22px; }
+.post-comparison-panel .section-heading { align-items: start; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }
+.post-comparison-panel .prompt-text { font-size: 17px; padding: 20px; }
+.post-comparison-panel .prompt-actions { gap: 12px; }
+.post-comparison-panel .run-list { gap: 28px; }
+.post-comparison-panel .run-facts { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; margin-block: 20px; }
+.post-comparison-panel dd { font-size: 20px; }
+.post-comparison-panel .media-gallery,.post-comparison-panel .reference-list { grid-template-columns: minmax(0,1fr); gap: 24px; }
+.post-comparison-panel .media-gallery { margin-top: 20px; }
+.post-comparison-panel figcaption { font-size: 17px; gap: 12px; }
+.post-comparison-panel .reference-caption { flex-wrap: wrap; }
+.post-comparison-panel .reference-caption > a { margin-top: 0; }
+.post-comparison-panel .reference-bundle { padding-inline: 12px; }
+.post-comparison-panel .demo-note { margin-top: 20px; }
+.comparison-selection-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; margin: 38px 0 24px; }
+.comparison-selection-heading h2 { font-size: 32px; }
+.compare-provider { display: block; color: var(--muted); font-size: 17px; margin-bottom: 8px; }
+.compare-disabled-note { margin-top: 10px; color: var(--muted); font-size: 16px; }
+.compare .compare-filters { flex-wrap: wrap; }
+.compare .compare-filters > label { flex: 1 1 180px; }
+@media (max-width: 767px) {
+  .journal-filters { gap: 16px; }
+  .journal-filters > label { max-width: none; flex-basis: 100%; }
+  .journal-filters > .button { margin-left: 0; }
+  .comparison-tabs { gap: 10px; }
+  .comparison-tabs > a { flex: 1 1 140px; padding: 12px 14px; }
+  .comparison-tabs > .group-compare-link { margin-left: 0; }
+  .reference-list { grid-template-columns: minmax(0,1fr); gap: 28px; }
+  .references-section > .section-heading { flex-wrap: wrap; align-items: start; gap: 18px; }
+  .references-section .reference-bundle { max-width: 100%; }
+  .group-post-picker { gap: 10px; }
+  .group-post-choice { width: 100%; }
+  .post-comparison-grid { grid-template-columns: minmax(0,1fr); }
+  .compare .compare-filters > label { flex: initial; }
+}
+.journal-filters { display: flex; flex-wrap: wrap; gap: 22px; align-items: end; margin-bottom: 34px; }
+.journal-filters > label { flex: 1 1 180px; max-width: 280px; }
+.journal-filters > .button { margin-left: auto; }
+.post-card-metadata { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 14px 0 0; color: var(--muted); }
+.post-card-metadata > div { display: flex; gap: 7px; min-width: 0; }
+.post-card-metadata dt,.post-card-metadata dd { font-size: 17px; line-height: 1.5; margin: 0; }
+.post-card-metadata dd { overflow-wrap: anywhere; }

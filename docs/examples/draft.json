@@ -1,0 +1,34 @@
+{
+  "title": "Isolated authoring example",
+  "slug": "isolated-authoring-example",
+  "summary": "Sample draft for an isolated test environment.",
+  "category": "Code",
+  "prompt": "Create a small result from the explicitly provided reference files. This example contains no measured benchmark results.",
+  "body": "Replace this with verified results after running the task.",
+  "status": "draft",
+  "isDemo": true,
+  "coverId": null,
+  "showcaseMediaIds": [],
+  "references": [
+    { "kind": "link", "url": "https://example.com/reference", "label": "Sample reference URL" }
+  ],
+  "groupId": null,
+  "runs": [
+    {
+      "model": "Record the actual model used",
+      "provider": null,
+      "customProvider": "",
+      "harness": "",
+      "author": "",
+      "elapsedSeconds": null,
+      "reasoningEffort": "",
+      "tokens": null,
+      "estimatedCostUsd": null,
+      "outcome": "Partial",
+      "notes": "Illustrative structure only; no measured run.",
+      "conditions": "",
+      "resultMediaIds": []
+    }
+  ],
+  "progress": []
+}

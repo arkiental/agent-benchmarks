@@ -1,0 +1,49 @@
+.admin-nav { gap: 24px; flex-wrap: wrap; }
+.admin-nav nav { flex-wrap: wrap; gap: 16px 30px; }
+.reference-editor { display: grid; gap: 22px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.reference-editor>legend { padding: 0 0 16px; font-size: 26px; }
+.reference-link-entry { display: grid; gap: 18px; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: end; }
+.reference-link-entry>button { justify-self: start; }
+.reference-editor-list { display: grid; gap: 24px; }
+.reference-editor-item { display: grid; gap: 20px; min-width: 0; border: 1px solid var(--line); margin: 0; padding: 24px; }
+.reference-editor-item>img { width: 300px; max-height: 200px; object-fit: contain; background: var(--surface); }
+.reference-editor-item .helper { overflow-wrap: anywhere; }
+.form-error>.text-button { display: flex; }
+.owner-group-list,.agent-token-list { border-bottom: 1px solid var(--line); }
+.owner-group,.agent-token { display: flex; gap: 28px; justify-content: space-between; align-items: flex-start; padding: 28px 0; border-top: 1px solid var(--line); }
+.owner-group>div,.agent-token>div { min-width: 0; }
+.owner-group h2 { font-size: 30px; margin-bottom: 12px; }
+.owner-group p,.agent-token p { color: var(--muted); }
+.owner-group>.button,.agent-token>.button { flex-shrink: 0; }
+.group-selected-posts { display: grid; gap: 4px; }
+.group-selected-posts>div { display: flex; gap: 24px; justify-content: space-between; align-items: baseline; }
+.group-selected-posts span { min-width: 0; overflow-wrap: anywhere; }
+.group-selected-posts button { flex-shrink: 0; }
+.group-post-options { display: grid; }
+.group-post-option { display: grid; grid-template-columns: 24px 90px minmax(0,1fr); gap: 20px; align-items: center; border-top: 1px solid var(--line); padding: 20px 0; }
+.group-post-option>input { margin: 0; }
+.group-post-option>img,.group-post-option>.missing-image { width: 90px; height: 70px; object-fit: cover; }
+.group-post-option>.missing-image { font-size: 12px; gap: 3px; }
+.group-post-option>span { display: grid; gap: 8px; min-width: 0; }
+.group-post-option strong { font-weight: 560; overflow-wrap: anywhere; }
+.group-post-option>span>span { font-weight: 400; color: var(--muted); font-size: 16px; }
+.agent-owner-layout { max-width: 960px; display: grid; gap: 32px; }
+.agent-scope-options { display: grid; gap: 16px; margin: 0; padding: 20px 0 0; border: 0; min-width: 0; }
+.agent-scope-options>legend { padding: 0; }
+.agent-create-button { justify-self: start; }
+.agent-secret { display: grid; gap: 22px; border: 1px solid #fff; padding: 28px; }
+.agent-secret textarea { overflow-wrap: anywhere; }
+.agent-existing-tokens { display: grid; gap: 28px; }
+.agent-token h3 { font-size: 26px; margin-bottom: 10px; }
+.agent-token p+p { margin-top: 10px; }
+@media (max-width: 767px) {
+  .admin-nav { gap: 12px; }
+  .admin-nav nav { gap: 12px 24px; }
+  .reference-link-entry { grid-template-columns: minmax(0,1fr); }
+  .reference-editor-item { padding: 20px; }
+  .owner-group,.agent-token { flex-direction: column; gap: 20px; }
+  .group-post-option { grid-template-columns: 24px 64px minmax(0,1fr); gap: 14px; }
+  .group-post-option>img,.group-post-option>.missing-image { width: 64px; height: 56px; }
+  .group-post-option strong { font-size: 17px; }
+  .agent-secret { padding: 20px; }
+}

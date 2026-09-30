@@ -1,6 +1,6 @@
 # Agent Benchmarks
 
-Self-hosted, single-owner journal for agent work. Posts hold the original prompt, a final showcase, ordered progress images/videos and manually recorded runs. The interface uses black, white and neutral grays.
+Self-hosted, single-owner journal for agent work. Posts hold the original prompt, references, a final showcase, ordered progress images/videos and manually recorded runs. The interface uses black, white and neutral grays.
 
 ## Run locally
 
@@ -46,11 +46,23 @@ Use `/admin` to create, edit, publish, unpublish and delete posts. A still cover
 
 Images: PNG/JPEG/WebP, default 12 MB, decoded and re-encoded without source metadata, at most 40 million source pixels. MP4: default 100 MB, H.264 with optional AAC audio, at most 4K per dimension and four hours. MP4s are probed, stripped of source metadata, remuxed for streaming, and given a still thumbnail. Videos play on demand with native controls. The media route supports byte ranges. Upload processing has a two-file concurrency cap, rate limits and a total storage quota (default 2 GB).
 
-Run fields include model, reasoning effort, elapsed seconds, total tokens, estimated USD cost, outcome and conditions. Values are authored; unknown metrics remain blank. Comparisons use published authored runs. There are no public submissions, accounts or invented community statistics.
+Run fields include provider, model, reasoning effort, elapsed seconds, total tokens, estimated USD cost, outcome and conditions. Provider choices are OpenAI, Google, Anthropic and Other with a custom name. Model and reasoning effort accept free text. Values are authored; unknown metadata remains blank. Journal search updates while typing, with provider/model/reasoning filters drawn from recorded published values. Combined run filters match the same run.
+
+References appear beneath the prompt in their recorded order. Attach up to 50 uploaded images/MP4s or HTTP(S) links; use drag handles or Earlier/Later to reorder. Visitors can download each processed file or a prompt-and-references ZIP containing `prompt.txt`, ordered `references.json` and attached media. External URLs are recorded in the manifest and never fetched by the server. ZIP downloads stream, with a 200 MiB total cap, two concurrent downloads and a per-IP rate limit. Larger sets remain individually downloadable. Processed media has stripped source metadata; the original upload bytes are not retained.
+
+In Admin → Groups, associate up to 20 whole posts. Provider/model tabs switch complete post content using normal browser history and shareable post URLs. Draft members remain private. The group's owner toggle controls side-by-side comparison; when enabled, visitors can select up to eight whole posts, with responsive columns for four or more providers. There are no public submissions, accounts or invented community statistics.
 
 Prompts support 100,000 characters. Long prompts collapse, expand, copy and download without altering the original. Published post HTML includes escaped OG/Twitter metadata with a bounded description and cover image; it includes recorded metrics when present and never embeds the full prompt. Draft metadata and draft-only media return 404 to visitors. Share previews already cached by third-party services cannot be revoked by this application.
 
+## Agent authoring
+
+The stable `/api/v1` API and local `npm run agent -- ...` CLI support full post metadata, galleries, references, uploads and comparison groups. See [authoring instructions](docs/authoring.md), [machine-readable schema](docs/authoring.schema.json) and [draft example](docs/examples/draft.json). The CLI reads only files explicitly named in its arguments.
+
+Agent credentials are disabled until the owner creates one in Admin → Agent tokens. No token is generated during installation, migration or startup. The owner chooses scopes and an expiry, copies the one-time secret privately, and can revoke it. Only a SHA-256 digest is stored. Draft authoring and publication use separate scopes; modifying an already published post or a group with published members requires `publish`. Browser administration retains session, origin and CSRF checks. Agent writes require a bearer credential and an idempotency key; reusing a key for another request returns 409. Updates require the current revision. Tokens belong in the caller's private environment, never source files, command arguments or logs.
+
 ## Configuration and reverse proxy
+
+Anonymous API traffic is limited to 240 requests per minute per trusted client address. Valid owner sessions and agent credentials each have a separate 600-request bucket, so bulk editing does not consume the visitor quota. Login, upload and bundle limits still apply independently. Forged cookies or bearer headers cannot obtain an authenticated bucket.
 
 `.env.example` documents the configurable origin, port, data directory, site name, session lifetime, image/video limits, storage quota and indexing. `PUBLIC_URL` must be a bare origin; use HTTPS outside localhost. Secure owner cookies are selected from this configured origin. Owner writes require that origin plus a session-specific CSRF token. Sessions are persisted and revoked on logout or password change.
 
@@ -60,7 +72,7 @@ This repository does not create DNS records, tunnel credentials, public tunnels,
 
 ## Backup, restore and upgrades
 
-Stop the app before maintenance. `--stopped` is your acknowledgment; it is not a process lock. This keeps the database and files consistent. Backups include all cataloged media, verified SHA-256 hashes, schema version and counts; owner sessions are removed. Copy verified snapshots off the host yourself.
+Stop the app before maintenance. `--stopped` is your acknowledgment; it is not a process lock. This keeps the database and files consistent. Backups include all cataloged media, verified SHA-256 hashes, schema version and counts; owner sessions, agent credentials and replay records are removed. Copy verified snapshots off the host yourself.
 
 ```sh
 # Node: stop npm start first
@@ -77,9 +89,9 @@ docker compose run --rm --no-deps journal node dist/scripts/restore.js /app/back
 docker compose up -d journal
 ```
 
-Restore verifies the entire snapshot before changing the target and retains prior data in a sibling `data.before-restore-*` directory. Confirm the restored journal before manually removing that retained copy. `.env` is intentionally excluded; back up configuration separately in a secure location. Sign in again after restoration.
+Restore verifies the entire snapshot before changing the target and retains prior data in a sibling `data.before-restore-*` directory. Confirm the restored journal before manually removing that retained copy. `.env` is intentionally excluded; back up configuration separately in a secure location. Sign in again after restoration and explicitly issue any replacement agent credentials.
 
-SQLite migrations run transactionally on startup. Schema version 2 adds video types, galleries and optional run metrics while preserving version 1 content. Older snapshots are accepted and migrated on startup. A database from a newer unsupported version is refused. Back up before upgrading, stop the app, rebuild, then start it. Keep the previous image/source and backup for rollback.
+SQLite migrations run transactionally on startup. Schema version 2 adds video types, galleries and optional run metrics. Version 3 adds references, provider metadata, comparison groups and scoped agent authoring while preserving previous content. Legacy providers remain unrecorded. Older snapshots are accepted and migrated on startup. A database from a newer unsupported version is refused. Back up before upgrading, stop the app, rebuild, then start it. Keep the previous image/source and backup for rollback.
 
 ## Verification
 

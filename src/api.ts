@@ -24,7 +24,7 @@ export function useResource<T>(url: string) {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(null); setData(null);
-    api<T>(url,{ signal: controller.signal }).then(setData).catch(error => { if (!controller.signal.aborted) setError(error.message || 'Connection failed.'); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    api<T>(url,{ signal: controller.signal }).then(result => { if (!controller.signal.aborted) setData(result); }).catch(error => { if (!controller.signal.aborted) setError(error.message || 'Connection failed.'); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   },[url,version]);
   return { data,error,loading,reload,setData };

@@ -208,3 +208,69 @@ test('50 progress items retain their order and remain separate from the final sh
   const excessive=await fixture.request(`/api/admin/posts/${post.id}`,{method:'PUT',body:JSON.stringify(input(images[0],{revision:saved.revision,progress:[...progress,progress[0]]}))},true);assert.equal(excessive.status,400);
   const duplicate=await fixture.request(`/api/admin/posts/${post.id}`,{method:'PUT',body:JSON.stringify(input(images[0],{revision:saved.revision,showcaseMediaIds:[images[0].id,images[0].id]}))},true);assert.equal(duplicate.status,400);
 }));
+
+test('providers and full-post groups preserve draft privacy, membership revisions and owner comparison control',async()=>withFixture(async fixture=>{
+  await fixture.signIn();const image=await fixture.upload();
+  const run={model:'Any free-text model name',provider:'Other' as const,customProvider:'Independent fixture provider',harness:'',author:'',elapsedSeconds:13,reasoningEffort:'A free-text reasoning level',tokens:null,estimatedCostUsd:null,outcome:'Completed' as const,notes:'',conditions:'',resultMediaIds:[]};
+  const first=await create(fixture,image,{slug:'group-first-fixture',status:'published',prompt:'First unique prompt.',runs:[run]});
+  const second=await create(fixture,image,{slug:'group-second-fixture',status:'published',prompt:'Second unique prompt.',runs:[{...run,provider:'Google',customProvider:'',model:'Second free-text model'}]});
+  const draft=await create(fixture,image,{slug:'group-private-fixture',title:'Private group member title',prompt:'Private group member prompt.'});
+  const response=await fixture.request('/api/admin/groups',{method:'POST',body:JSON.stringify({title:'Fixture group',allowSideBySide:false,postIds:[first.id,second.id,draft.id]})},true);assert.equal(response.status,201,await response.clone().text());const group=await response.json() as {id:string;revision:number;posts:Post[]};assert.equal(group.posts.length,3);
+  assert.equal((await fixture.request(`/api/admin/posts/${first.id}`,{method:'PUT',body:JSON.stringify(input(image,{slug:first.slug,revision:first.revision}))},true)).status,409);
+  const publicResponse=await fixture.request(`/api/posts/${first.slug}`);const publicText=await publicResponse.text();assert.ok(!publicText.includes(draft.title));assert.ok(!publicText.includes(draft.prompt));const publicPost=JSON.parse(publicText) as Post;assert.equal(publicPost.group?.posts.length,2);assert.equal(publicPost.runs[0].provider,'Other');assert.equal(publicPost.runs[0].customProvider,run.customProvider);
+  const html=await(await fixture.request(`/posts/${first.slug}`)).text();assert.ok(html.includes('Independent fixture provider'));assert.ok(!html.includes(draft.title));assert.ok(!html.includes('First unique prompt.'));
+  assert.equal((await fixture.request(`/api/compare?groupId=${group.id}`)).status,403);
+  const global=await(await fixture.request('/api/compare')).json() as {runs:{canCompare:boolean}[]};assert.ok(global.runs.every(item=>!item.canCompare));
+  assert.equal((await fixture.request(`/api/admin/groups/${group.id}`,{method:'PUT',body:JSON.stringify({title:'Fixture group',allowSideBySide:true,postIds:[first.id,second.id,draft.id],revision:group.revision})},true)).status,200);
+  const compareResponse=await fixture.request(`/api/compare?groupId=${group.id}`);assert.equal(compareResponse.status,200);const compare=await compareResponse.json() as {posts:Post[];group:{revision:number};runs:{canCompare:boolean}[]};assert.deepEqual(compare.posts.map(post=>post.prompt),['First unique prompt.','Second unique prompt.']);assert.ok(compare.runs.every(item=>item.canCompare));
+  assert.equal((await fixture.request(`/api/admin/groups/${group.id}`,{method:'PUT',body:JSON.stringify({title:'Stale edit',allowSideBySide:false,postIds:[],revision:group.revision})},true)).status,409);
+  const other=await fixture.request('/api/admin/groups',{method:'POST',body:JSON.stringify({title:'Other fixture',allowSideBySide:true,postIds:[first.id]})},true);assert.equal(other.status,409);
+  assert.equal((await fixture.request(`/api/admin/groups/${group.id}`,{method:'DELETE',body:JSON.stringify({revision:compare.group.revision})},true)).status,204);
+  const detached=await(await fixture.request(`/api/posts/${first.slug}`)).json() as Post;assert.equal(detached.groupId,null);assert.equal(detached.group,null);assert.equal(detached.prompt,'First unique prompt.');
+}));
+
+test('reference URLs, bounds and custom provider validation reject unsafe authoring input',async()=>withFixture(async fixture=>{
+  await fixture.signIn();const image=await fixture.upload();
+  const base=input(image,{references:[{kind:'media',mediaId:image.id,label:'Uploaded reference'}]});
+  for(const url of ['file:///private/file','javascript:alert(1)','https://name:password@example.com/'])assert.equal((await fixture.request('/api/admin/posts',{method:'POST',body:JSON.stringify({...base,references:[{kind:'link',url,label:'Unsafe link'}]})},true)).status,400);
+  assert.equal((await fixture.request('/api/admin/posts',{method:'POST',body:JSON.stringify({...base,references:Array.from({length:51},()=>base.references![0])})},true)).status,400);
+  assert.equal((await fixture.request('/api/admin/posts',{method:'POST',body:JSON.stringify({...base,references:[{kind:'media',mediaId:randomUUID(),label:''}]})},true)).status,400);
+  const run={model:'Free-text fixture',provider:'Other',customProvider:'',harness:'',author:'',elapsedSeconds:null,outcome:'Completed',notes:'',conditions:'',resultMediaIds:[]};
+  assert.equal((await fixture.request('/api/admin/posts',{method:'POST',body:JSON.stringify({...base,runs:[run]})},true)).status,400);
+}));
+
+test('search combines actual provider, model and reasoning values from the same published run',async()=>withFixture(async fixture=>{
+  await fixture.signIn();const image=await fixture.upload();
+  const run={model:'Model one',provider:'OpenAI' as const,customProvider:'',harness:'',author:'',elapsedSeconds:null,reasoningEffort:'Custom deep effort',outcome:'Completed' as const,notes:'',conditions:'',resultMediaIds:[]};
+  const mixed=await create(fixture,image,{title:'Search fixture alpha',slug:'search-alpha',summary:'Recorded project',status:'published',runs:[run,{...run,model:'Model two',provider:'Other',customProvider:'Local provider',reasoningEffort:'Quick effort'}]});
+  await create(fixture,image,{title:'Search fixture beta',slug:'search-beta',status:'published',runs:[{...run,model:'Model one',provider:'Other',customProvider:'Local provider'}]});
+  await create(fixture,image,{slug:'search-private',runs:[{...run,model:'Private model',reasoningEffort:'Private effort'}]});
+  const query=new URLSearchParams({q:'alpha',provider:'OpenAI',model:'Model one',reasoning:'Custom deep effort',category:'Code'});
+  const matched=await(await fixture.request(`/api/posts?${query}`)).json() as {total:number;posts:Post[]};assert.equal(matched.total,1);assert.equal(matched.posts[0].id,mixed.id);
+  query.set('provider','Local provider');assert.equal((await(await fixture.request(`/api/posts?${query}`)).json() as {total:number}).total,0);
+  query.delete('model');query.delete('reasoning');assert.equal((await(await fixture.request(`/api/posts?${query}`)).json() as {total:number}).total,1);
+  const catalog=await(await fixture.request('/api/catalog')).json() as {providers:string[];models:string[];reasoningEfforts:string[]};assert.deepEqual(catalog.providers,['Local provider','OpenAI']);assert.ok(!catalog.models.includes('Private model'));assert.ok(!catalog.reasoningEfforts.includes('Private effort'));
+  const cards=await(await fixture.request('/api/posts')).json() as {posts:{providers:string[];reasoningEfforts:string[]}[]};assert.ok(cards.posts.every(post=>post.providers.length>0));assert.ok(cards.posts.every(post=>post.reasoningEfforts.length>0));
+}));
+
+test('authenticated bulk traffic has a bounded bucket separate from visitors and forged credentials',async()=>withFixture(async fixture=>{
+  await fixture.signIn();
+  for(let index=0;index<245;index++)assert.equal((await fixture.request('/api/site',{},true)).status,200);
+  assert.equal((await fixture.request('/api/site')).status,200);
+  let visitorLimited=false;
+  for(let index=0;index<240;index++){
+    const response=await fixture.request('/api/site');
+    if(response.status===429){visitorLimited=true;assert.ok(response.headers.get('retry-after'));break;}
+    assert.equal(response.status,200);
+  }
+  assert.ok(visitorLimited);
+  assert.equal((await fixture.request('/api/site',{headers:{Authorization:'Bearer abt_'+'0'.repeat(64),'X-Forwarded-For':'198.51.100.4'}})).status,429);
+  assert.equal((await fixture.request('/api/site',{},true)).status,200);
+  let ownerLimited=false;
+  for(let index=0;index<360;index++){
+    const response=await fixture.request('/api/site',{},true);
+    if(response.status===429){ownerLimited=true;break;}
+    assert.equal(response.status,200);
+  }
+  assert.ok(ownerLimited);
+}));

@@ -1,0 +1,505 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent Benchmarks authoring requests",
+  "description": "Version 1 full replacement requests. PUT requires the latest revision. Publication requires a still-image cover and publish scope. Custom providers require provider Other and customProvider. Reference links must be HTTP(S) without embedded credentials.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Post"
+    },
+    {
+      "$ref": "#/$defs/Group"
+    }
+  ],
+  "$defs": {
+    "Post": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "slug": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 180,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Design",
+            "Websites",
+            "Code",
+            "Research",
+            "Other"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100000
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 30000
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "published"
+          ]
+        },
+        "isDemo": {
+          "type": "boolean"
+        },
+        "coverId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "showcaseMediaIds": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "references": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "media"
+                  },
+                  "mediaId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 160
+                  }
+                },
+                "required": [
+                  "kind",
+                  "mediaId",
+                  "label"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "link"
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2048,
+                    "format": "uri"
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 160
+                  }
+                },
+                "required": [
+                  "kind",
+                  "url",
+                  "label"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "groupId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runs": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "provider": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "OpenAI",
+                      "Google",
+                      "Anthropic",
+                      "Other"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "customProvider": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "harness": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "author": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "elapsedSeconds": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31536000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reasoningEffort": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "tokens": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "estimatedCostUsd": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "Completed",
+                  "Partial",
+                  "Failed"
+                ]
+              },
+              "notes": {
+                "type": "string",
+                "maxLength": 12000
+              },
+              "conditions": {
+                "type": "string",
+                "maxLength": 6000
+              },
+              "resultMediaIds": {
+                "maxItems": 12,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              }
+            },
+            "required": [
+              "model",
+              "harness",
+              "author",
+              "elapsedSeconds",
+              "outcome",
+              "notes",
+              "conditions",
+              "resultMediaIds"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "progress": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "mediaId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "elapsedSeconds": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31536000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "mediaId",
+              "label",
+              "elapsedSeconds"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "title",
+        "slug",
+        "summary",
+        "category",
+        "prompt",
+        "body",
+        "status",
+        "isDemo",
+        "coverId",
+        "runs",
+        "progress"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "published"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "coverId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "showcaseMediaIds": {
+              "uniqueItems": true
+            },
+            "runs": {
+              "items": {
+                "if": {
+                  "properties": {
+                    "provider": {
+                      "const": "Other"
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "customProvider"
+                  ],
+                  "properties": {
+                    "customProvider": {
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "customProvider": {
+                      "pattern": "^\\s*$"
+                    }
+                  }
+                }
+              }
+            },
+            "references": {
+              "items": {
+                "if": {
+                  "properties": {
+                    "kind": {
+                      "const": "link"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "url": {
+                      "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^/@?#\\s]+(?:[/?#]|$)"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Group": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "allowSideBySide": {
+          "type": "boolean"
+        },
+        "postIds": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "title",
+        "allowSideBySide",
+        "postIds"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "properties": {
+            "postIds": {
+              "uniqueItems": true
+            }
+          }
+        }
+      ]
+    },
+    "TokenCreation": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "scopes": {
+          "minItems": 1,
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "posts:read",
+              "posts:write",
+              "publish",
+              "media:write",
+              "groups:write"
+            ]
+          }
+        },
+        "expiresInDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90
+        }
+      },
+      "required": [
+        "name",
+        "scopes",
+        "expiresInDays"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-api-version": 1,
+  "x-authentication": "Authorization: Bearer owner-issued token",
+  "x-write-header": "Idempotency-Key: 16 to 120 ASCII letters, digits, dot, underscore, colon or hyphen",
+  "x-scopes": [
+    "posts:read",
+    "posts:write",
+    "publish",
+    "media:write",
+    "groups:write"
+  ]
+}
