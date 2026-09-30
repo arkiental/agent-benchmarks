@@ -172,7 +172,7 @@ test('crawler metadata is escaped, bounded and limited to published posts and re
   const published=await fixture.request(`/api/admin/posts/${draft.id}`,{ method:'PUT',body:JSON.stringify(input(cover,{ ...changes,revision:draft.revision,status:'published' })) },true);assert.equal(published.status,200);
   const crawler=await fixture.request(`/posts/${draft.slug}`,{ headers:{ 'User-Agent':'Discordbot/2.0' } });const html=await crawler.text();
   assert.equal(crawler.status,200);assert.match(html,/og:title" content="Fixture &lt;title&gt; &amp; &quot;quoted&quot;/);assert.ok(html.includes(`content="${fixture.origin}/media/${cover.id}"`));
-  assert.match(html,/Reasoning: High/);assert.match(html,/1m 13s/);assert.match(html,/12,345 tokens/);assert.match(html,/Estimated \$0.025/);assert.match(html,/twitter:card/);
+  assert.match(html,/Reasoning: High/);assert.match(html,/1m 13s/);assert.match(html,/Tokens: 12,345/);assert.match(html,/Cost: \$0.025 USD/);assert.match(html,/twitter:card/);
   assert.ok(!html.includes('SECRET_PROMPT_CONTENT'));assert.ok(html.length<4000);
   const description=html.match(/og:description" content="([^"]*)"/)![1];assert.ok(description.replace(/&[^;]+;/g,'x').length<=300);
   const post=await (await fixture.request(`/api/posts/${draft.slug}`)).json() as Post;assert.equal(post.prompt,prompt);assert.equal(post.runs[0].tokens,12345);
