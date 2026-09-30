@@ -60,6 +60,8 @@ The stable `/api/v1` API and local `npm run agent -- ...` CLI support full post 
 
 Agent credentials are disabled until the owner creates one in Admin → Agent tokens. No token is generated during installation, migration or startup. The owner chooses scopes and an expiry, copies the one-time secret privately, and can revoke it. Only a SHA-256 digest is stored. Draft authoring and publication use separate scopes; modifying an already published post or a group with published members requires `publish`. Browser administration retains session, origin and CSRF checks. Agent writes require a bearer credential and an idempotency key; reusing a key for another request returns 409. Updates require the current revision. Tokens belong in the caller's private environment, never source files, command arguments or logs.
 
+The optional [saved-token MCP connector](docs/connector.md) provides reusable post/media tools after one owner-controlled setup. It stores an encrypted credential outside the repository, uses the existing scoped API, and supports named render collections. Credential activation and MCP registration are not performed by installation or startup.
+
 ## Configuration and reverse proxy
 
 Anonymous API traffic is limited to 240 requests per minute per trusted client address. Valid owner sessions and agent credentials each have a separate 600-request bucket, so bulk editing does not consume the visitor quota. Login, upload and bundle limits still apply independently. Forged cookies or bearer headers cannot obtain an authenticated bucket.

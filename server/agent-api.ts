@@ -32,6 +32,7 @@ postJson.allOf = [
   { if: { properties: { status: { const: 'published' } }, required: ['status'] }, then: { properties: { coverId: { type: 'string', format: 'uuid' } } } },
   { properties: {
     showcaseMediaIds: { uniqueItems: true },
+    collections: { description: 'Ordered named render collections. Unique collection IDs, images only, at most 500 image entries across all collections.', items: { properties: { mediaIds: { uniqueItems: true } } } },
     runs: { items: { if: { properties: { provider: { const: 'Other' } }, required: ['provider'] }, then: { required: ['customProvider'], properties: { customProvider: { minLength: 1, pattern: '\\S' } } }, else: { properties: { customProvider: { pattern: '^\\s*$' } } } } },
     references: { items: { if: { properties: { kind: { const: 'link' } }, required: ['kind'] }, then: { properties: { url: { pattern: '^[Hh][Tt][Tt][Pp][Ss]?://[^/@?#\\s]+(?:[/?#]|$)' } } } } },
   } },
@@ -41,7 +42,7 @@ groupJson.allOf = [{ properties: { postIds: { uniqueItems: true } } }];
 export const authoringSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   title: 'Agent Benchmarks authoring requests',
-  description: 'Version 1 full replacement requests. PUT requires the latest revision. Publication requires a still-image cover and publish scope. Custom providers require provider Other and customProvider. Reference links must be HTTP(S) without embedded credentials.',
+  description: 'Version 1 full replacement requests. PUT requires the latest revision. Publication requires a still-image cover and publish scope. Custom providers require provider Other and customProvider. Reference links must be HTTP(S) without embedded credentials. Render collections contain ordered still-image IDs; omit collections on edit to preserve existing collections.',
   oneOf: [{ $ref: '#/$defs/Post' }, { $ref: '#/$defs/Group' }],
   $defs: {
     Post: postJson,
@@ -49,6 +50,7 @@ export const authoringSchema = {
     TokenCreation: z.toJSONSchema(tokenCreationSchema, { target: 'draft-2020-12' }),
   },
   'x-api-version': 1,
+  'x-max-total-collection-images': 500,
   'x-authentication': 'Authorization: Bearer owner-issued token',
   'x-write-header': 'Idempotency-Key: 16 to 120 ASCII letters, digits, dot, underscore, colon or hyphen',
   'x-scopes': agentScopes,

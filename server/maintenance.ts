@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 const mediaName=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-thumb\.webp|\.(?:webp|mp4))$/;
 const manifestSchema=z.object({
-  version:z.literal(1), createdAt:z.string().datetime(), schemaVersion:z.union([z.literal(1),z.literal(2),z.literal(3)]),
+  version:z.literal(1), createdAt:z.string().datetime(), schemaVersion:z.union([z.literal(1),z.literal(2),z.literal(3),z.literal(4)]),
   posts:z.number().int().min(0), media:z.number().int().min(0),
   files:z.array(z.object({ path:z.string(),bytes:z.number().int().min(0),sha256:z.string().regex(/^[a-f0-9]{64}$/) }).strict()).min(1),
 }).strict();
@@ -22,7 +22,7 @@ async function removeStage(parent: string,target: string,prefix: string) {
   await fs.rm(target,{ recursive:true,force:true });
 }
 function validateDatabase(database: Database.Database) {
-  if (![1,2,3].includes(database.pragma('user_version',{ simple:true }) as number)) throw new Error('Unsupported backup database version.');
+  if (![1,2,3,4].includes(database.pragma('user_version',{ simple:true }) as number)) throw new Error('Unsupported backup database version.');
   if (database.pragma('integrity_check',{ simple:true })!=='ok' || (database.pragma('foreign_key_check') as unknown[]).length) throw new Error('Database integrity check failed.');
 }
 export async function createBackup(dataDirectory: string,backupParent: string,stopped: boolean) {
@@ -55,7 +55,7 @@ export async function createBackup(dataDirectory: string,backupParent: string,st
       if (!mediaName.test(filename)) throw new Error('Unexpected media filename in database.');
       await fs.copyFile(path.join(dataDir,'uploads',filename),path.join(stage,'uploads',filename)); files.push(`uploads/${filename}`);
     }
-    const manifest:BackupManifest={ version:1,createdAt:new Date().toISOString(),schemaVersion:database.pragma('user_version',{ simple:true }) as 1 | 2 | 3,posts,media:rows.length,files:[] };
+    const manifest:BackupManifest={ version:1,createdAt:new Date().toISOString(),schemaVersion:database.pragma('user_version',{ simple:true }) as 1 | 2 | 3 | 4,posts,media:rows.length,files:[] };
     for (const file of files) { const absolute=path.join(stage,file); manifest.files.push({ path:file,bytes:(await fs.stat(absolute)).size,sha256:await hash(absolute) }); }
     await fs.writeFile(path.join(stage,'manifest.json'),JSON.stringify(manifest,null,2)+'\n',{ mode:0o600 });
     await fs.rename(stage,destination);

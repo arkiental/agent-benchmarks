@@ -18,10 +18,12 @@
     "agent": "node dist/scripts/agent.js",
     "seed:demo": "node dist/scripts/seed.js",
     "backup": "node dist/scripts/backup.js",
-    "restore": "node dist/scripts/restore.js"
+    "restore": "node dist/scripts/restore.js",
+    "connector": "node dist/scripts/connector.js"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "@tabler/icons-react": "^3.48.0",
     "better-sqlite3": "^13.0.3",
     "dotenv": "^18.0.4",

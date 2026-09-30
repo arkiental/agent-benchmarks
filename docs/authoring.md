@@ -1,6 +1,6 @@
 # Authoring API and local CLI
 
-The version 1 API creates drafts, edits full posts, uploads explicitly chosen files, and manages comparison groups. It uses the same validation, storage limits, revision checks and media processing as the owner editor. References, final renders and progress remain distinct ordered fields. Uploaded images are re-encoded WebP; accepted H.264/AAC MP4 files retain video playback. Reference links are recorded as URLs; the server never fetches them.
+The version 1 API creates drafts, edits full posts, uploads explicitly chosen files, and manages comparison groups. It uses the same validation, storage limits, revision checks and media processing as the owner editor. References, final renders, progress and named render collections remain distinct ordered fields. Uploaded images are re-encoded WebP; accepted H.264/AAC MP4 files retain video playback. Reference links are recorded as URLs; the server never fetches them.
 
 ## Owner-controlled credentials
 
@@ -55,7 +55,7 @@ There is no agent token-issuance route and no agent post/media deletion route. C
 
 ### Post fields
 
-Use `docs/examples/draft.json` as a starting point. Get an uploaded media ID from the upload response and add it to `coverId`, `showcaseMediaIds`, `progress`, run `resultMediaIds`, or media references. A published post requires a still-image cover. Set `status: "draft"` while collecting results. Do not invent elapsed time, tokens or cost: use `null` or omit optional values.
+Use `docs/examples/draft.json` as a starting point. Get an uploaded media ID from the upload response and add it to `coverId`, `showcaseMediaIds`, `collections`, `progress`, run `resultMediaIds`, or media references. A published post requires a still-image cover. Set `status: "draft"` while collecting results. Do not invent elapsed time, tokens or cost: use `null` or omit optional values.
 
 Each run has a free-text `model` and `reasoningEffort`. Provider is `OpenAI`, `Google`, `Anthropic`, `Other`, or `null` when not recorded. `Other` requires a nonempty `customProvider`; other choices require it to be empty. Original prompts allow 100,000 characters. The total JSON request still must fit 512 KiB.
 
@@ -71,6 +71,24 @@ Each run has a free-text `model` and `reasoningEffort`. Provider is `OpenAI`, `G
 Upload a video exactly like an image. A reference URL must be HTTP(S), have no embedded username/password, and be no longer than 2,048 characters. The downloadable prompt/reference ZIP includes a URL manifest and uploaded reference files; it does not fetch web links. Individual file downloads and ZIPs obey the post's publication permissions.
 
 Final showcase and progress each accept at most 50 items. `showcaseMediaIds` is the final ordering. `progress` is ordered `{mediaId,label,elapsedSeconds}`. Run result images accept at most 12 IDs per run. Groups associate up to 20 full posts; `allowSideBySide` controls whether that group permits simultaneous comparison. Changing membership increments affected post revisions; refetch before editing those posts.
+
+### Render collections
+
+`collections` is an optional ordered array of named render groups within a post. These are separate from comparison groups, which associate different posts. A collection uses a stable UUID, a nonempty title of up to 120 characters, and ordered still-image IDs:
+
+```json
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000002",
+    "title": "Daylight",
+    "mediaIds": ["00000000-0000-4000-8000-000000000001"]
+  }
+]
+```
+
+A post accepts up to 20 collections, 100 unique images per collection and 500 image entries in total. Collection IDs must be unique within the post. Empty collections are allowed while organizing a draft. Array order determines collection and image order. Upload images first, then include their IDs when creating or editing a post. Only existing still images are accepted; MP4s remain in the final or progress galleries. An omitted `collections` field preserves existing collections on edit; send `[]` to remove them. Older posts return `collections: []`. Collections follow the post's publication permissions and share the existing revision/idempotency checks.
+
+Images accept up to 32 MiB by default (`UPLOAD_MAX_MB=32`), including PNG, JPEG and WebP. `/api/site` returns the active `uploadMaxBytes` limit; it applies equally to the owner editor and authenticated API. Decoding remains capped at 40 million pixels, and processing/storage limits remain enforced. Configured image limits may be raised to 64 MiB. The default MP4 limit remains 100 MiB. Any reverse proxy must allow at least the larger active image/video limit plus multipart overhead.
 
 ### Revisions and retries
 

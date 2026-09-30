@@ -17,6 +17,12 @@ export const groupSchema = z.object({
 }).strict();
 const elapsed = z.number().int().min(0).max(31_536_000).nullable();
 const imageIds = z.array(idSchema).max(12);
+export const renderCollectionLimits = { maxCollections: 20, maxImages: 100, maxTotalImages: 500 } as const;
+export const renderCollectionSchema = z.object({
+  id: idSchema,
+  title: z.string().trim().min(1).max(120),
+  mediaIds: z.array(idSchema).max(renderCollectionLimits.maxImages).refine(ids => new Set(ids).size === ids.length, 'Select each collection image once.'),
+}).strict();
 export const runSchema = z.object({
   id: idSchema.optional(),
   model: z.string().trim().min(1).max(120),
@@ -44,6 +50,7 @@ export const postSchema = z.object({
   isDemo: z.boolean(),
   coverId: idSchema.nullable(),
   showcaseMediaIds: z.array(idSchema).max(50).optional(),
+  collections: z.array(renderCollectionSchema).max(renderCollectionLimits.maxCollections).optional(),
   references: z.array(referenceSchema).max(50).optional(),
   groupId: idSchema.nullable().optional(),
   runs: z.array(runSchema).max(20),
@@ -61,6 +68,9 @@ export const postSchema = z.object({
   if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', path: ['runs'], message: 'Run IDs must be unique.' });
   const showcase = post.showcaseMediaIds || [];
   if (new Set(showcase).size !== showcase.length) ctx.addIssue({ code: 'custom', path: ['showcaseMediaIds'], message: 'Final showcase items must be unique.' });
+  const collections = post.collections || [];
+  if (new Set(collections.map(collection => collection.id)).size !== collections.length) ctx.addIssue({ code: 'custom', path: ['collections'], message: 'Collection IDs must be unique.' });
+  if (collections.reduce((total, collection) => total + collection.mediaIds.length, 0) > renderCollectionLimits.maxTotalImages) ctx.addIssue({ code: 'custom', path: ['collections'], message: 'Use at most 500 images across the collections.' });
   post.runs.forEach((run, index) => {
     if (run.provider === 'Other' && !run.customProvider?.trim()) ctx.addIssue({ code: 'custom', path: ['runs', index, 'customProvider'], message: 'Enter the provider name.' });
     if (run.provider !== 'Other' && run.customProvider?.trim()) ctx.addIssue({ code: 'custom', path: ['runs', index, 'customProvider'], message: 'Choose Other for a custom provider.' });
@@ -69,10 +79,11 @@ export const postSchema = z.object({
 export type PostInput = z.infer<typeof postSchema>;
 export type RunInput = z.infer<typeof runSchema>;
 export type Reference = z.infer<typeof referenceSchema>;
+export type RenderCollection = z.infer<typeof renderCollectionSchema>;
 export type GroupInput = z.infer<typeof groupSchema>;
 export type Media = { id: string; name: string; kind: 'image' | 'video'; durationSeconds: number | null; width: number; height: number; bytes: number; url: string; thumbnailUrl: string; createdAt: string };
 export type Run = Omit<RunInput, 'id'> & { id: string };
-export type Post = Omit<PostInput, 'revision' | 'runs' | 'showcaseMediaIds' | 'references' | 'groupId'> & { id: string; revision: number; runs: Run[]; showcaseMediaIds: string[]; references: Reference[]; groupId: string | null; group: ComparisonGroup | null; createdAt: string; updatedAt: string; publishedAt: string | null; media: Record<string, Media> };
+export type Post = Omit<PostInput, 'revision' | 'runs' | 'showcaseMediaIds' | 'collections' | 'references' | 'groupId'> & { id: string; revision: number; runs: Run[]; showcaseMediaIds: string[]; collections: RenderCollection[]; references: Reference[]; groupId: string | null; group: ComparisonGroup | null; createdAt: string; updatedAt: string; publishedAt: string | null; media: Record<string, Media> };
 export type PostSummary = Pick<Post, 'id' | 'title' | 'slug' | 'summary' | 'category' | 'status' | 'isDemo' | 'coverId' | 'publishedAt' | 'updatedAt' | 'revision' | 'groupId'> & { cover: Media | null; models: string[]; providers: string[]; reasoningEfforts: string[]; runCount: number };
 export type ComparisonGroup = { id: string; title: string; allowSideBySide: boolean; revision: number; posts: PostSummary[] };
 export type Comparison = Run & { postId: string; postTitle: string; slug: string; category: string; isDemo: boolean; cover: Media | null; resultImages: Media[]; groupId: string | null; canCompare: boolean };

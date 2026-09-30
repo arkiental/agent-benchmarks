@@ -8,12 +8,13 @@ import { EmptyState, ErrorState, Loading, Pager, MissingImage } from './componen
 import { AdminGroups } from './admin-groups';
 import { AdminAgents } from './admin-agents';
 import { Upload } from './upload';
+import { CollectionEditor } from './admin-collections';
 import './admin-enhancements.css';
 
 type Session = { configured: boolean; authenticated: boolean; csrf: string | null };
 type MediaList = { media: (Media & { used: number })[]; total: number; bytes: number; limitBytes: number; page: number; pages: number };
 type PostList = { posts: PostSummary[]; total: number; page: number; pages: number };
-const emptyPost: PostInput = { title: '',slug: '',summary: '',category: 'Design',prompt: '',body: '',status: 'draft',isDemo: false,coverId: null,showcaseMediaIds: [],references: [],groupId: null,runs: [],progress: [] };
+const emptyPost: PostInput = { title: '',slug: '',summary: '',category: 'Design',prompt: '',body: '',status: 'draft',isDemo: false,coverId: null,showcaseMediaIds: [],collections: [],references: [],groupId: null,runs: [],progress: [] };
 const newRun = (): RunInput => ({ model: '',provider: null,customProvider: '',harness: '',author: '',elapsedSeconds: null,reasoningEffort: '',tokens: null,estimatedCostUsd: null,outcome: 'Completed',notes: '',conditions: '',resultMediaIds: [] });
 
 export default function Admin() {
@@ -97,6 +98,11 @@ function Editor({ initial }: { initial?: Post }) {
       showcaseMediaIds:target==='showcase'?[...(current.showcaseMediaIds || []),image.id]:current.showcaseMediaIds,
       progress:target==='progress'?[...current.progress,{ mediaId:image.id,label:image.name,elapsedSeconds:null }]:current.progress,
       references:target==='references'?[...(current.references || []),{kind:'media' as const,mediaId:image.id,label:image.name.slice(0,160)}].slice(0,50):current.references }));
+    mediaResource.reload();
+  }
+  function uploadCollection(image:Media,collectionId:string) {
+    setKnownMedia(current=>({...current,[image.id]:image})); setMessage('');
+    setForm(current=>({...current,collections:(current.collections || []).map(collection=>collection.id===collectionId?{...collection,mediaIds:[...collection.mediaIds,image.id]}:collection)}));
     mediaResource.reload();
   }
   async function save(event: React.FormEvent<HTMLFormElement>) {
@@ -198,6 +204,7 @@ function Editor({ initial }: { initial?: Post }) {
           <div className="showcase-editor">{(form.showcaseMediaIds || []).map((id,index)=><fieldset className="gallery-editor-item" key={id} onDragOver={event=>event.preventDefault()} onDrop={event=>dropped(event,'showcase',index)}><legend>Final {index+1}</legend>{knownMedia[id] && <img src={knownMedia[id].thumbnailUrl} alt={knownMedia[id].name} loading="lazy"/>}<div className="row-actions">{dragHandle('showcase',index)}<button className="text-button" type="button" disabled={index===0} onClick={()=>moveShowcase(index,index-1)} aria-label={`Move final ${index+1} earlier`}>Earlier</button><button className="text-button" type="button" disabled={index===(form.showcaseMediaIds || []).length-1} onClick={()=>moveShowcase(index,index+1)} aria-label={`Move final ${index+1} later`}>Later</button><button className="text-button" type="button" onClick={()=>update('showcaseMediaIds',(form.showcaseMediaIds || []).filter(value=>value!==id))}>Remove</button></div></fieldset>)}</div>
           {(form.showcaseMediaIds || []).length<50 && <MediaSelect label="Add existing final media" value="" onChange={id=>{if(id)update('showcaseMediaIds',[...(form.showcaseMediaIds || []),id]);}} media={media.filter(image=>!(form.showcaseMediaIds || []).includes(image.id))}/>}
         </section>
+        <CollectionEditor collections={form.collections || []} media={media} knownMedia={knownMedia} onChange={value=>update('collections',value)} onUpload={uploadCollection} onBusy={uploadBusy} busy={uploads>0}/>
         <section className="editor-section">
           <h2>Progress</h2>
           <Upload onBusy={uploadBusy} multiple maxFiles={50-form.progress.length} onUpload={image=>upload(image,'progress')}/>
@@ -218,7 +225,7 @@ function Editor({ initial }: { initial?: Post }) {
   </>;
 }
 function toInput(post: Post): PostInput {
-  return { title: post.title,slug: post.slug,summary: post.summary,category: post.category,prompt: post.prompt,body: post.body,status: post.status,isDemo: post.isDemo,coverId: post.coverId,showcaseMediaIds: post.showcaseMediaIds,references: post.references,groupId: post.groupId,runs: post.runs,progress: post.progress,revision: post.revision };
+  return { title: post.title,slug: post.slug,summary: post.summary,category: post.category,prompt: post.prompt,body: post.body,status: post.status,isDemo: post.isDemo,coverId: post.coverId,showcaseMediaIds: post.showcaseMediaIds,collections: post.collections || [],references: post.references,groupId: post.groupId,runs: post.runs,progress: post.progress,revision: post.revision };
 }
 function ReferenceEditor({references,media,knownMedia,onChange,onUpload,onBusy}: {
   references:Reference[]; media:Media[]; knownMedia:Record<string,Media>; onChange:(value:Reference[])=>void;

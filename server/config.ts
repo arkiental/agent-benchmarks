@@ -29,7 +29,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     publicUrl: url.origin, host: env.HOST || '127.0.0.1', port: number(env.PORT, 8787, 1, 65535),
     dataDir: path.resolve(env.DATA_DIR || 'data'), siteName: (env.SITE_NAME || 'Agent Benchmarks').trim().slice(0, 80) || 'Agent Benchmarks',
     passwordHash, sessionHours: number(env.SESSION_HOURS, 12, 1, 48), trustedProxies,
-    uploadMaxBytes: number(env.UPLOAD_MAX_MB, 12, 1, 40) * 1024 * 1024,
+    uploadMaxBytes: number(env.UPLOAD_MAX_MB, 32, 1, 64) * 1024 * 1024,
     videoMaxBytes: number(env.VIDEO_MAX_MB, 100, 1, 500) * 1024 * 1024,
     storageMaxBytes: number(env.STORAGE_MAX_MB, 2048, 20, 1048576) * 1024 * 1024,
     allowIndexing: env.ALLOW_INDEXING === 'true',

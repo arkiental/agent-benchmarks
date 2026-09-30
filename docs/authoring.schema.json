@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Agent Benchmarks authoring requests",
-  "description": "Version 1 full replacement requests. PUT requires the latest revision. Publication requires a still-image cover and publish scope. Custom providers require provider Other and customProvider. Reference links must be HTTP(S) without embedded credentials.",
+  "description": "Version 1 full replacement requests. PUT requires the latest revision. Publication requires a still-image cover and publish scope. Custom providers require provider Other and customProvider. Reference links must be HTTP(S) without embedded credentials. Render collections contain ordered still-image IDs; omit collections on edit to preserve existing collections.",
   "oneOf": [
     {
       "$ref": "#/$defs/Post"
@@ -78,6 +78,40 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "collections": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "mediaIds": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "mediaIds"
+            ],
+            "additionalProperties": false
           }
         },
         "references": {
@@ -354,6 +388,16 @@
             "showcaseMediaIds": {
               "uniqueItems": true
             },
+            "collections": {
+              "description": "Ordered named render collections. Unique collection IDs, images only, at most 500 image entries across all collections.",
+              "items": {
+                "properties": {
+                  "mediaIds": {
+                    "uniqueItems": true
+                  }
+                }
+              }
+            },
             "runs": {
               "items": {
                 "if": {
@@ -493,6 +537,7 @@
     }
   },
   "x-api-version": 1,
+  "x-max-total-collection-images": 500,
   "x-authentication": "Authorization: Bearer owner-issued token",
   "x-write-header": "Idempotency-Key: 16 to 120 ASCII letters, digits, dot, underscore, colon or hyphen",
   "x-scopes": [

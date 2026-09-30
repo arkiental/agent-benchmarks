@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { Prompt,ShareLink,ExtraRunFacts } from './post-controls';
 import { References } from './references';
+import { RenderCollections } from './collections';
 import type { Post, PostSummary, Comparison, ComparisonGroup } from '../shared/schema';
 import { duration, outcomes, providerLabel } from '../shared/schema';
 import { useResource } from './api';
@@ -135,6 +136,7 @@ function PostContent({ post,compareLinks=true }: { post:Post;compareLinks?:boole
       <h2>Final showcase</h2>
       <MediaGallery items={post.showcaseMediaIds.filter(id => post.media[id]).map((id,index) => ({ image:post.media[id],label:`Final ${index+1}` }))}/>
     </section>}
+    <RenderCollections collections={post.collections || []} media={post.media}/>
     {post.body && <section className="detail-section"><h2>The result</h2><Paragraphs text={post.body}/></section>}
     <Prompt key={post.id} text={post.prompt} slug={post.slug}/>
     <References post={post}/>

@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { providerLabel } from '../shared/schema.js';
 import type { Post, PostInput, Media, Run, PostSummary, GroupInput, ComparisonGroup } from '../shared/schema.js';
 
-export type PostRow = { id: string; title: string; slug: string; summary: string; category: Post['category']; prompt: string; body: string; status: Post['status']; is_demo: number; cover_id: string | null; progress_json: string; showcase_json: string; references_json: string; group_id: string | null; revision: number; created_at: string; updated_at: string; published_at: string | null };
+export type PostRow = { id: string; title: string; slug: string; summary: string; category: Post['category']; prompt: string; body: string; status: Post['status']; is_demo: number; cover_id: string | null; progress_json: string; showcase_json: string; collections_json: string; references_json: string; group_id: string | null; revision: number; created_at: string; updated_at: string; published_at: string | null };
 export type GroupRow = { id: string; title: string; allow_side_by_side: number; revision: number; created_at: string; updated_at: string };
 export type MediaRow = { id: string; name: string; kind: 'image' | 'video'; duration_seconds: number | null; width: number; height: number; bytes: number; created_at: string; filename: string; thumb_filename: string };
 export class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
@@ -26,7 +26,7 @@ export class Store {
   }
   migrate() {
     const version = this.db.pragma('user_version', { simple: true }) as number;
-    if (version > 3) throw new Error('Database is newer than this application. Restore a compatible application version.');
+    if (version > 4) throw new Error('Database is newer than this application. Restore a compatible application version.');
     if (version === 0) this.db.transaction(() => {
       this.db.exec(`
         CREATE TABLE posts (
@@ -77,6 +77,10 @@ export class Store {
           created_at INTEGER NOT NULL, PRIMARY KEY(credential_id,key));
         PRAGMA user_version = 3;`);
     })();
+    if (version < 4) this.db.transaction(() => {
+      this.db.exec(`ALTER TABLE posts ADD COLUMN collections_json TEXT NOT NULL DEFAULT '[]';
+        PRAGMA user_version = 4;`);
+    })();
   }
   getPost(id: string): PostRow | undefined { return this.db.prepare('SELECT * FROM posts WHERE id=?').get(id) as PostRow | undefined; }
   getMedia(id: string): MediaRow | undefined { return this.db.prepare('SELECT * FROM media WHERE id=?').get(id) as MediaRow | undefined; }
@@ -96,7 +100,7 @@ export class Store {
     const mediaRows = this.db.prepare('SELECT media.* FROM media JOIN post_media ON media.id=post_media.media_id WHERE post_media.post_id=?').all(row.id) as MediaRow[];
     return { ...this.summary(row), title: row.title, slug: row.slug, summary: row.summary, category: row.category, prompt: row.prompt,
       body: row.body, status: row.status, isDemo: Boolean(row.is_demo), coverId: row.cover_id, runs: this.runs(row.id),
-      progress: JSON.parse(row.progress_json), showcaseMediaIds: JSON.parse(row.showcase_json), references: JSON.parse(row.references_json), group: row.group_id ? this.group(row.group_id, includeDrafts) || null : null, createdAt: row.created_at, media: Object.fromEntries(mediaRows.map(media => [media.id, this.media(media)])) };
+      progress: JSON.parse(row.progress_json), showcaseMediaIds: JSON.parse(row.showcase_json), collections: JSON.parse(row.collections_json), references: JSON.parse(row.references_json), group: row.group_id ? this.group(row.group_id, includeDrafts) || null : null, createdAt: row.created_at, media: Object.fromEntries(mediaRows.map(media => [media.id, this.media(media)])) };
   }
   save(input: PostInput, id: string = randomUUID()): Post {
     return this.db.transaction(() => {
@@ -104,21 +108,25 @@ export class Store {
       if (existing && input.revision !== existing.revision) throw new HttpError(409, 'This post changed in another window. Reload it before saving.');
       const duplicate = this.db.prepare('SELECT id FROM posts WHERE slug=? AND id<>?').get(input.slug, id);
       if (duplicate) throw new HttpError(409, 'That URL is already in use. Choose another.');
+      const collections = input.collections ?? (existing ? JSON.parse(existing.collections_json) as Post['collections'] : []);
       const references = input.references ?? (existing ? JSON.parse(existing.references_json) as Post['references'] : []);
       const groupId = input.groupId === undefined ? existing?.group_id || null : input.groupId;
       if (groupId && !this.getGroup(groupId)) throw new HttpError(400, 'Comparison group no longer exists.');
       if (groupId && groupId !== existing?.group_id && (this.db.prepare('SELECT COUNT(*) AS count FROM posts WHERE group_id=?').get(groupId) as { count: number }).count >= 20) throw new HttpError(400, 'A comparison group supports up to 20 posts.');
-      const mediaIds = [...new Set([...(input.coverId ? [input.coverId] : []), ...(input.showcaseMediaIds || []), ...input.progress.map(image => image.mediaId), ...input.runs.flatMap(run => run.resultMediaIds), ...references.flatMap(reference => reference.kind === 'media' ? [reference.mediaId] : [])])];
+      const mediaIds = [...new Set([...(input.coverId ? [input.coverId] : []), ...(input.showcaseMediaIds || []), ...collections.flatMap(collection => collection.mediaIds), ...input.progress.map(image => image.mediaId), ...input.runs.flatMap(run => run.resultMediaIds), ...references.flatMap(reference => reference.kind === 'media' ? [reference.mediaId] : [])])];
       for (const mediaId of mediaIds) if (!this.getMedia(mediaId)) throw new HttpError(400, 'A selected image no longer exists. Choose it again.');
+      for (const collection of collections) for (const mediaId of collection.mediaIds) {
+        if (this.getMedia(mediaId)?.kind !== 'image') throw new HttpError(400, 'Render collections accept still images. Videos belong in the final or progress galleries.');
+      }
       if (input.coverId && this.getMedia(input.coverId)?.kind !== 'image') throw new HttpError(400, 'Choose a still image for the cover. Videos belong in the galleries.');
       const now = new Date().toISOString();
       const publishedAt = input.status === 'published' ? existing?.published_at || now : existing?.published_at || null;
-      this.db.prepare(`INSERT INTO posts (id,title,slug,summary,category,prompt,body,status,is_demo,cover_id,progress_json,showcase_json,references_json,group_id,revision,created_at,updated_at,published_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,slug=excluded.slug,summary=excluded.summary,
+      this.db.prepare(`INSERT INTO posts (id,title,slug,summary,category,prompt,body,status,is_demo,cover_id,progress_json,showcase_json,collections_json,references_json,group_id,revision,created_at,updated_at,published_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,slug=excluded.slug,summary=excluded.summary,
         category=excluded.category,prompt=excluded.prompt,body=excluded.body,status=excluded.status,is_demo=excluded.is_demo,cover_id=excluded.cover_id,
-        progress_json=excluded.progress_json,showcase_json=excluded.showcase_json,references_json=excluded.references_json,group_id=excluded.group_id,revision=excluded.revision,updated_at=excluded.updated_at,published_at=excluded.published_at`).run(
+        progress_json=excluded.progress_json,showcase_json=excluded.showcase_json,collections_json=excluded.collections_json,references_json=excluded.references_json,group_id=excluded.group_id,revision=excluded.revision,updated_at=excluded.updated_at,published_at=excluded.published_at`).run(
         id,input.title,input.slug,input.summary,input.category,input.prompt,input.body,input.status,Number(input.isDemo),input.coverId,
-        JSON.stringify(input.progress),JSON.stringify(input.showcaseMediaIds || []),JSON.stringify(references),groupId,(existing?.revision || 0)+1,existing?.created_at || now,now,publishedAt);
+        JSON.stringify(input.progress),JSON.stringify(input.showcaseMediaIds || []),JSON.stringify(collections),JSON.stringify(references),groupId,(existing?.revision || 0)+1,existing?.created_at || now,now,publishedAt);
       if (groupId !== (existing?.group_id || null)) {
         for (const changedGroup of new Set([groupId, existing?.group_id].filter(Boolean))) this.db.prepare('UPDATE comparison_groups SET revision=revision+1,updated_at=? WHERE id=?').run(now, changedGroup);
       }
