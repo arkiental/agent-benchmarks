@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { idSchema, postSchema } from '../shared/schema.js';
-import type { Post, PostInput, PostSummary } from '../shared/schema.js';
+import { groupSchema, idSchema, postSchema } from '../shared/schema.js';
+import type { ComparisonGroup, GroupInput, Post, PostInput, PostSummary } from '../shared/schema.js';
 
 const execute = promisify(execFile);
 const credentialSchema = z.object({
@@ -104,10 +104,34 @@ export class BenchmarkConnector {
     return redact({ posts: found.slice(0, limit), scanned, total, more, note: more ? 'More posts may match; this search is bounded and stops once the requested result count is reached.' : undefined });
   }
   async getPost(id: string) { return this.request(await this.access('posts:read'), '/api/v1/posts/' + idSchema.parse(id)) as Promise<Post>; }
+  async listGroups(page: number, limit: number) { return this.request(await this.access('posts:read'), `/api/v1/groups?page=${page}&limit=${limit}`); }
+  async getGroup(id: string) { return this.request(await this.access('posts:read'), '/api/v1/groups/' + idSchema.parse(id)) as Promise<ComparisonGroup>; }
+  private async groupAccess(postIds: string[], confirmPublishedChange: boolean) {
+    const posts = await Promise.all(postIds.map(id => this.getPost(id)));
+    const publication = posts.some(post => post.status === 'published');
+    if (publication && !confirmPublishedChange) throw new Error('Confirm comparison changes involving published posts only when the user requested them.');
+    const credential = await this.access('posts:write', publication);
+    const grant = await this.request(credential, '/api/v1/me') as { token?: { scopes?: string[] } };
+    if (!grant.token?.scopes?.includes('groups:write')) throw new Error('The owner-issued token requires groups:write scope for comparison changes.');
+    return credential;
+  }
+  async createGroup(raw: GroupInput, key: string, confirmPublishedChange: boolean) {
+    const input = groupSchema.parse(raw);
+    if (input.revision !== undefined) throw new Error('Omit revision when creating a comparison group.');
+    const credential = await this.groupAccess(input.postIds, confirmPublishedChange);
+    return this.request(credential, '/api/v1/groups', { method: 'POST', body: JSON.stringify(input) }, key);
+  }
+  async updateGroup(id: string, raw: GroupInput, key: string, confirmPublishedChange: boolean) {
+    idSchema.parse(id); const input = groupSchema.parse(raw);
+    if (input.revision === undefined) throw new Error('Include the current comparison-group revision.');
+    const existing = await this.getGroup(id);
+    const credential = await this.groupAccess([...new Set([...input.postIds, ...existing.posts.map(post => post.id)])], confirmPublishedChange);
+    return this.request(credential, '/api/v1/groups/' + id, { method: 'PUT', body: JSON.stringify(input) }, key);
+  }
   async createPost(raw: PostInput, key: string) {
     const input = postSchema.parse(raw);
     if (input.status !== 'draft' || input.revision !== undefined) throw new Error('Create a draft without revision; use the separate publish tool when explicitly requested.');
-    if (input.groupId) throw new Error('Comparison-group assignments use the owner editor; render collections belong in the post input.');
+    if (input.groupId) throw new Error('Create the draft first, then use comparison-group tools to associate posts.');
     return this.request(await this.access('posts:write'), '/api/v1/posts', { method: 'POST', body: JSON.stringify(input) }, key);
   }
   async updatePost(id: string, raw: PostInput, key: string, publishedChange: boolean) {
@@ -115,7 +139,7 @@ export class BenchmarkConnector {
     if (input.revision === undefined) throw new Error('Include the current post revision.');
     const existing = await this.getPost(id), publication = input.status === 'published' || existing.status === 'published';
     if (publication && !publishedChange) throw new Error('Set confirmPublishedChange only when the user requested a change to a published post.');
-    if (input.groupId !== undefined && input.groupId !== existing.groupId) throw new Error('Preserve the comparison-group assignment; change it in the owner editor.');
+    if (input.groupId !== undefined && input.groupId !== existing.groupId) throw new Error('Preserve the comparison-group assignment; change it through the comparison-group tools.');
     return this.request(await this.access('posts:write', publication), '/api/v1/posts/' + id, { method: 'PUT', body: JSON.stringify(input) }, key);
   }
   async publishPost(id: string, revision: number, key: string) {
@@ -162,6 +186,10 @@ export function createConnectorServer(credentials: CredentialProvider = loadWind
   server.registerTool('bench_schema', { description: 'Get the current complete post authoring schema, including ordered render collections, references, galleries and run metadata.', inputSchema: z.object({}).strict(), annotations: read }, () => safely(() => api.schema()));
   server.registerTool('bench_search_posts', { description: 'Search authorized post summaries, including drafts. Check for an existing post before creating one; results are bounded.', inputSchema: z.object({ q: z.string().max(320).default(''), status: z.enum(['draft', 'published']).optional(), limit: z.number().int().min(1).max(60).default(24) }).strict(), annotations: read }, ({ q, status, limit }) => safely(() => api.search(q, status, limit)));
   server.registerTool('bench_get_post', { description: 'Read a complete post and its current revision, ordered collections, media and references.', inputSchema: z.object({ id: idSchema }).strict(), annotations: read }, ({ id }) => safely(() => api.getPost(id)));
+  server.registerTool('bench_list_groups', { description: 'List authorized comparison groups and their ordered post summaries.', inputSchema: z.object({ page: z.number().int().min(1).max(10000).default(1), limit: z.number().int().min(1).max(60).default(24) }).strict(), annotations: read }, ({ page, limit }) => safely(() => api.listGroups(page, limit)));
+  server.registerTool('bench_get_group', { description: 'Read one comparison group and its current revision.', inputSchema: z.object({ id: idSchema }).strict(), annotations: read }, ({ id }) => safely(() => api.getGroup(id)));
+  server.registerTool('bench_create_group', { description: 'Associate user-requested posts in an ordered comparison group. Requires the existing server-issued groups:write grant; published membership also requires confirmation and owner-enabled publication.', inputSchema: z.object({ group: groupSchema, idempotencyKey: keySchema, confirmPublishedChange: z.boolean().default(false) }).strict(), annotations: write }, ({ group, idempotencyKey, confirmPublishedChange }) => safely(() => api.createGroup(group, idempotencyKey, confirmPublishedChange)));
+  server.registerTool('bench_update_group', { description: 'Update comparison membership and side-by-side permission using the fetched revision. Preserve unrelated members. Published membership changes require explicit user authorization.', inputSchema: z.object({ id: idSchema, group: groupSchema, idempotencyKey: keySchema, confirmPublishedChange: z.boolean().default(false) }).strict(), annotations: { ...write, destructiveHint: true } }, ({ id, group, idempotencyKey, confirmPublishedChange }) => safely(() => api.updateGroup(id, group, idempotencyKey, confirmPublishedChange)));
   server.registerTool('bench_create_draft', { description: 'Create one full draft. Use only user-provided facts and an original stable idempotency key; reuse that key for an identical retry within 24 hours.', inputSchema: z.object({ post: postSchema, idempotencyKey: keySchema }).strict(), annotations: write }, ({ post, idempotencyKey }) => safely(() => api.createPost(post, idempotencyKey)));
   server.registerTool('bench_update_post', { description: 'Replace schema input fields using the fetched revision. Preserve unrelated prompt, metadata, galleries, collections and references. Confirm published changes only when explicitly requested.', inputSchema: z.object({ id: idSchema, post: postSchema, idempotencyKey: keySchema, confirmPublishedChange: z.boolean().default(false) }).strict(), annotations: { ...write, destructiveHint: true } }, ({ id, post, idempotencyKey, confirmPublishedChange }) => safely(() => api.updatePost(id, post, idempotencyKey, confirmPublishedChange)));
   server.registerTool('bench_publish_post', { description: 'Publish an existing post only when the user explicitly requested publication. Requires owner-enabled publish scope; keeps all content and checks the supplied revision.', inputSchema: z.object({ id: idSchema, revision: z.number().int().min(1), idempotencyKey: keySchema }).strict(), annotations: write }, ({ id, revision, idempotencyKey }) => safely(() => api.publishPost(id, revision, idempotencyKey)));

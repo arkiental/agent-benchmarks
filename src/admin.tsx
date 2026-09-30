@@ -14,7 +14,7 @@ import './admin-enhancements.css';
 type Session = { configured: boolean; authenticated: boolean; csrf: string | null };
 type MediaList = { media: (Media & { used: number })[]; total: number; bytes: number; limitBytes: number; page: number; pages: number };
 type PostList = { posts: PostSummary[]; total: number; page: number; pages: number };
-const emptyPost: PostInput = { title: '',slug: '',summary: '',category: 'Design',prompt: '',body: '',status: 'draft',isDemo: false,coverId: null,showcaseMediaIds: [],collections: [],references: [],groupId: null,runs: [],progress: [] };
+const emptyPost: PostInput = { title: '',slug: '',summary: '',provider: null,customProvider: '',model: '',reasoningEffort: '',tokens: null,elapsedSeconds: null,estimatedCostUsd: null,category: 'Design',prompt: '',body: '',status: 'draft',isDemo: false,coverId: null,showcaseMediaIds: [],collections: [],references: [],groupId: null,runs: [],progress: [] };
 const newRun = (): RunInput => ({ model: '',provider: null,customProvider: '',harness: '',author: '',elapsedSeconds: null,reasoningEffort: '',tokens: null,estimatedCostUsd: null,outcome: 'Completed',notes: '',conditions: '',resultMediaIds: [] });
 
 export default function Admin() {
@@ -154,6 +154,15 @@ function Editor({ initial }: { initial?: Post }) {
             <label>Category<select aria-label="Category" value={form.category} onChange={event=>update('category',event.target.value as PostInput['category'])}>{categories.map(category=><option key={category}>{category}</option>)}</select></label>
           </div>
           <label>Short description<textarea rows={2} value={form.summary} maxLength={320} onChange={event=>update('summary',event.target.value)}/></label>
+          <div className="form-columns post-metadata-editor">
+            <label>Provider<select aria-label="Provider" value={form.provider || ''} onChange={event=>{update('provider',(event.target.value || null) as PostInput['provider']);update('customProvider','');}}><option value="">Not provided</option>{providers.map(provider=><option key={provider}>{provider}</option>)}</select></label>
+            {form.provider==='Other' && <label>Custom provider<input value={form.customProvider || ''} maxLength={80} onChange={event=>update('customProvider',event.target.value)}/></label>}
+            <label>Model<input value={form.model || ''} maxLength={120} onChange={event=>update('model',event.target.value)}/></label>
+            <label>Reasoning<input value={form.reasoningEffort || ''} maxLength={80} onChange={event=>update('reasoningEffort',event.target.value)}/></label>
+            <label>Token Count<input type="number" min={0} max={Number.MAX_SAFE_INTEGER} step={1} value={form.tokens ?? ''} onChange={event=>update('tokens',event.target.value===''?null:Number(event.target.value))}/></label>
+            <label>Time<input aria-label="Time" aria-describedby="post-time-unit" type="number" min={0} max={31536000} step={1} value={form.elapsedSeconds ?? ''} onChange={event=>update('elapsedSeconds',event.target.value===''?null:Number(event.target.value))}/><span className="helper" id="post-time-unit">Seconds</span></label>
+            <label>Cost<input aria-label="Cost" aria-describedby="post-cost-unit" type="number" min={0} max={1000000} step="any" value={form.estimatedCostUsd ?? ''} onChange={event=>update('estimatedCostUsd',event.target.value===''?null:Number(event.target.value))}/><span className="helper" id="post-cost-unit">USD</span></label>
+          </div>
           <label>Comparison group<select value={form.groupId || ''} onChange={event=>update('groupId',event.target.value || null)} disabled={groupResource.loading || Boolean(groupResource.error)}><option value="">No group</option>{form.groupId && !groupResource.data?.groups.some(group=>group.id===form.groupId) && <option value={form.groupId}>{initial?.group?.title || 'Current group'}</option>}{groupResource.data?.groups.map(group=><option key={group.id} value={group.id}>{group.title}</option>)}</select><span className="helper">Grouped posts appear as model tabs. <Link to="/admin/groups">Manage groups</Link></span></label>
           {groupResource.loading && <p role="status" className="helper">Loading groups...</p>}
           {groupResource.error && <div className="form-error" role="alert">{groupResource.error}<button type="button" className="text-button" onClick={groupResource.reload}>Retry groups</button></div>}
@@ -225,7 +234,11 @@ function Editor({ initial }: { initial?: Post }) {
   </>;
 }
 function toInput(post: Post): PostInput {
-  return { title: post.title,slug: post.slug,summary: post.summary,category: post.category,prompt: post.prompt,body: post.body,status: post.status,isDemo: post.isDemo,coverId: post.coverId,showcaseMediaIds: post.showcaseMediaIds,collections: post.collections || [],references: post.references,groupId: post.groupId,runs: post.runs,progress: post.progress,revision: post.revision };
+  return { title: post.title,slug: post.slug,summary: post.summary,category: post.category,prompt: post.prompt,body: post.body,status: post.status,isDemo: post.isDemo,coverId: post.coverId,showcaseMediaIds: post.showcaseMediaIds,collections: post.collections || [],references: post.references,groupId: post.groupId,runs: post.runs,progress: post.progress,revision: post.revision,
+    ...(post.provider!==undefined && {provider:post.provider}),...(post.customProvider!==undefined && {customProvider:post.customProvider}),
+    ...(post.model!==undefined && {model:post.model}),...(post.reasoningEffort!==undefined && {reasoningEffort:post.reasoningEffort}),
+    ...(post.tokens!==undefined && {tokens:post.tokens}),...(post.elapsedSeconds!==undefined && {elapsedSeconds:post.elapsedSeconds}),
+    ...(post.estimatedCostUsd!==undefined && {estimatedCostUsd:post.estimatedCostUsd}) };
 }
 function ReferenceEditor({references,media,knownMedia,onChange,onUpload,onBusy}: {
   references:Reference[]; media:Media[]; knownMedia:Record<string,Media>; onChange:(value:Reference[])=>void;

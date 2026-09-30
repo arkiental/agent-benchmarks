@@ -26,6 +26,8 @@ const querySchema = z.object({
   groupId: z.union([idSchema, z.literal('')]).default(''),
   page: z.coerce.number().int().min(1).max(10000).default(1), limit: z.coerce.number().int().min(1).max(60).default(24),
 }).strip();
+const postProviderSql = "CASE WHEN json_extract(posts.work_metadata_json,'$.provider')='Other' THEN COALESCE(NULLIF(json_extract(posts.work_metadata_json,'$.customProvider'),''),'Other') ELSE json_extract(posts.work_metadata_json,'$.provider') END";
+const runProviderSql = "CASE WHEN runs.provider='Other' THEN COALESCE(NULLIF(runs.custom_provider,''),'Other') ELSE runs.provider END";
 const clientDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../client');
 export function createApp(config: Config, store = new Store(config.dataDir), clientDirectory = clientDir) {
   const app = express();
@@ -67,16 +69,16 @@ export function createApp(config: Config, store = new Store(config.dataDir), cli
   app.use('/api', apiLimit);
   app.get('/api/site', (_req, res) => res.json({ name: config.siteName, publicUrl: config.publicUrl, uploadMaxBytes: config.uploadMaxBytes, videoMaxBytes: config.videoMaxBytes }));
   app.get('/api/catalog', (_req, res) => {
-    const models = (store.db.prepare("SELECT DISTINCT runs.model FROM runs JOIN posts ON posts.id=runs.post_id WHERE posts.status='published' ORDER BY runs.model").all() as { model: string }[]).map(row => row.model);
+    const models = (store.db.prepare(`SELECT json_extract(work_metadata_json,'$.model') AS model FROM posts WHERE status='published' AND COALESCE(json_extract(work_metadata_json,'$.model'),'')<>'' UNION SELECT runs.model FROM runs JOIN posts ON posts.id=runs.post_id WHERE posts.status='published' ORDER BY model`).all() as { model: string }[]).map(row => row.model);
     const categories = (store.db.prepare("SELECT DISTINCT category FROM posts WHERE status='published' ORDER BY category").all() as { category: string }[]).map(row => row.category);
-    const providers = (store.db.prepare("SELECT DISTINCT CASE WHEN provider='Other' THEN custom_provider ELSE provider END AS provider_name FROM runs JOIN posts ON posts.id=runs.post_id WHERE posts.status='published' AND COALESCE(provider,'')<>'' AND CASE WHEN provider='Other' THEN custom_provider ELSE provider END <>'' ORDER BY provider_name").all() as { provider_name: string }[]).map(row => row.provider_name);
-    const reasoningEfforts = (store.db.prepare("SELECT DISTINCT reasoning_effort FROM runs JOIN posts ON posts.id=runs.post_id WHERE posts.status='published' AND reasoning_effort<>'' ORDER BY reasoning_effort").all() as { reasoning_effort: string }[]).map(row => row.reasoning_effort);
+    const providers = (store.db.prepare(`SELECT ${postProviderSql} AS provider_name FROM posts WHERE status='published' AND COALESCE(${postProviderSql},'')<>'' UNION SELECT ${runProviderSql} AS provider_name FROM runs JOIN posts ON posts.id=runs.post_id WHERE posts.status='published' AND COALESCE(${runProviderSql},'')<>'' ORDER BY provider_name`).all() as { provider_name: string }[]).map(row => row.provider_name);
+    const reasoningEfforts = (store.db.prepare(`SELECT json_extract(work_metadata_json,'$.reasoningEffort') AS reasoning_effort FROM posts WHERE status='published' AND COALESCE(json_extract(work_metadata_json,'$.reasoningEffort'),'')<>'' UNION SELECT runs.reasoning_effort FROM runs JOIN posts ON posts.id=runs.post_id WHERE posts.status='published' AND runs.reasoning_effort<>'' ORDER BY reasoning_effort`).all() as { reasoning_effort: string }[]).map(row => row.reasoning_effort);
     res.json({ models, categories, providers, reasoningEfforts });
   });
   app.get('/api/posts', (req, res) => {
     const query = querySchema.parse(req.query);
-    const params = [query.q, `%${query.q}%`, `%${query.q}%`, query.category, query.category, query.model, query.provider, query.reasoning, query.model, query.model, query.provider, query.provider, query.reasoning, query.reasoning];
-    const where = "posts.status='published' AND (?='' OR title LIKE ? OR summary LIKE ?) AND (?='' OR category=?) AND ((?='' AND ?='' AND ?='') OR EXISTS(SELECT 1 FROM runs WHERE runs.post_id=posts.id AND (?='' OR model=?) AND (?='' OR CASE WHEN provider='Other' THEN custom_provider ELSE provider END=?) AND (?='' OR reasoning_effort=?)))";
+    const params = [query.q, `%${query.q}%`, `%${query.q}%`, query.category, query.category, query.model, query.model, query.provider, query.provider, query.reasoning, query.reasoning, query.model, query.model, query.provider, query.provider, query.reasoning, query.reasoning];
+    const where = `posts.status='published' AND (?='' OR title LIKE ? OR summary LIKE ?) AND (?='' OR category=?) AND (((?='' OR json_extract(posts.work_metadata_json,'$.model')=?) AND (?='' OR ${postProviderSql}=?) AND (?='' OR json_extract(posts.work_metadata_json,'$.reasoningEffort')=?)) OR EXISTS(SELECT 1 FROM runs WHERE runs.post_id=posts.id AND (?='' OR runs.model=?) AND (?='' OR ${runProviderSql}=?) AND (?='' OR runs.reasoning_effort=?)))`;
     const total = (store.db.prepare(`SELECT COUNT(*) AS total FROM posts WHERE ${where}`).get(...params) as { total: number }).total;
     const rows = store.db.prepare(`SELECT * FROM posts WHERE ${where} ORDER BY published_at DESC,id LIMIT ? OFFSET ?`).all(...params,query.limit,(query.page-1)*query.limit) as PostRow[];
     res.json({ posts: rows.map(row => store.summary(row)), total, page: query.page, pages: Math.ceil(total/query.limit) });

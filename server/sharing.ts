@@ -1,16 +1,19 @@
 import type { Config } from './config.js';
 import type { Post } from '../shared/schema.js';
-import { duration, providerLabel } from '../shared/schema.js';
+import { duration, providerLabel, postMetadata } from '../shared/schema.js';
 
 const escape = (value: string) => value.replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]!));
 export function shareDescription(post: Post) {
-  const runs = post.runs.slice(0,3).map(run => [
-    [providerLabel(run), run.model].filter(Boolean).join(' / '), run.reasoningEffort ? `Reasoning: ${run.reasoningEffort}` : '',
-    run.elapsedSeconds !== null ? duration(run.elapsedSeconds) : '',
-    run.tokens != null ? `${run.tokens.toLocaleString('en-US')} tokens` : '',
-    run.estimatedCostUsd != null ? `Estimated $${run.estimatedCostUsd.toFixed(4).replace(/0+$/,'').replace(/\.$/,'')}` : '',
-  ].filter(Boolean).join(' · '));
-  return [post.isDemo ? 'Example content' : '',...runs,post.summary].filter(Boolean).join(' / ').replace(/[\s\u0000-\u001f]+/g,' ').slice(0,300);
+  const metadata = postMetadata(post);
+  const short = (value: string, limit: number) => value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
+  const facts = [
+    [short(providerLabel(metadata), 32), short(metadata.model || '', 64)].filter(Boolean).join(' / '),
+    metadata.reasoningEffort ? `Reasoning: ${short(metadata.reasoningEffort, 32)}` : '',
+    metadata.tokens != null ? `Tokens: ${metadata.tokens.toLocaleString('en-US')}` : '',
+    metadata.elapsedSeconds != null ? `Time: ${duration(metadata.elapsedSeconds)}` : '',
+    metadata.estimatedCostUsd != null ? `Cost: $${metadata.estimatedCostUsd.toLocaleString('en-US', { maximumFractionDigits: 6 })} USD` : '',
+  ].filter(Boolean).join(' · ');
+  return [post.isDemo ? 'Example content' : '', facts, post.summary].filter(Boolean).join(' / ').replace(/[\s\u0000-\u001f]+/g, ' ').slice(0, 300);
 }
 export function pageHtml(template: string, config: Config, post?: Post) {
   const title = post ? `${post.title} | ${config.siteName}` : config.siteName;

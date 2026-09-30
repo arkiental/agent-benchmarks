@@ -4,7 +4,7 @@ import { Prompt,ShareLink,ExtraRunFacts } from './post-controls';
 import { References } from './references';
 import { RenderCollections } from './collections';
 import type { Post, PostSummary, Comparison, ComparisonGroup } from '../shared/schema';
-import { duration, outcomes, providerLabel } from '../shared/schema';
+import { duration, outcomes, postMetadata, providerLabel } from '../shared/schema';
 import { useResource } from './api';
 import { Loading, EmptyState, ErrorState, Pager, Paragraphs, ImageViewer, MediaGallery, MissingImage } from './components';
 import './enhancements.css';
@@ -127,9 +127,23 @@ function ComparisonTabs({ group,activeId,showCompare=true }: { group:ComparisonG
   </nav>;
 }
 
+function PostWorkMetadata({ post }: { post:Post }) {
+  const metadata=postMetadata(post),provider=providerLabel(metadata);
+  if (!provider&&!metadata.model&&!metadata.reasoningEffort&&metadata.tokens==null&&metadata.elapsedSeconds==null&&metadata.estimatedCostUsd==null) return null;
+  return <dl className="post-work-metadata">
+    {provider && <div><dt>Provider</dt><dd>{provider}</dd></div>}
+    {metadata.model && <div><dt>Model</dt><dd>{metadata.model}</dd></div>}
+    {metadata.reasoningEffort && <div><dt>Reasoning</dt><dd>{metadata.reasoningEffort}</dd></div>}
+    {metadata.tokens!=null && <div><dt>Token Count</dt><dd>{metadata.tokens.toLocaleString('en-US')}</dd></div>}
+    {metadata.elapsedSeconds!=null && <div><dt>Time</dt><dd>{duration(metadata.elapsedSeconds)}</dd></div>}
+    {metadata.estimatedCostUsd!=null && <div><dt>Cost</dt><dd>{'$'}{metadata.estimatedCostUsd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:4})} USD</dd></div>}
+  </dl>;
+}
+
 function PostContent({ post,compareLinks=true }: { post:Post;compareLinks?:boolean }) {
   const cover=post.coverId ? post.media[post.coverId] : null;
   return <>
+    <PostWorkMetadata post={post}/>
     {post.isDemo && <p className="demo-note">This is a layout example, with no benchmark measurements.</p>}
     {cover && <ImageViewer image={cover} label={post.title} className="cover-image"/>}
     {post.showcaseMediaIds.length>0 && <section className="detail-section">
@@ -140,7 +154,7 @@ function PostContent({ post,compareLinks=true }: { post:Post;compareLinks?:boole
     {post.body && <section className="detail-section"><h2>The result</h2><Paragraphs text={post.body}/></section>}
     <Prompt key={post.id} text={post.prompt} slug={post.slug}/>
     <References post={post}/>
-    {post.runs.length>0 ? <section className="detail-section">
+    {post.runs.length>0 && <section className="detail-section">
       <div className="section-heading">
         <h2>{post.runs.length===1 ? 'The run' : 'Runs'}</h2>
         {compareLinks && post.runs.length>1 && (!post.group || post.group.allowSideBySide) && <Link className="text-link" to={`/compare?postId=${post.id}`}>Compare these runs</Link>}
@@ -158,7 +172,7 @@ function PostContent({ post,compareLinks=true }: { post:Post;compareLinks?:boole
         {run.notes && <Paragraphs text={run.notes}/>}
         <MediaGallery items={run.resultMediaIds.filter(id => post.media[id]).map((id,index) => ({ image:post.media[id],label:`${run.model} result ${index+1}` }))}/>
       </article>)}</div>
-    </section> : !post.isDemo && <section className="detail-section"><h2>Run details</h2><p className="muted">No run metadata has been recorded.</p></section>}
+    </section>}
     {post.progress.length>0 && <section className="detail-section">
       <h2>Progress</h2>
       <MediaGallery items={post.progress.filter(step => post.media[step.mediaId]).map(step => ({ image:post.media[step.mediaId],label:step.label,elapsedSeconds:step.elapsedSeconds }))}/>

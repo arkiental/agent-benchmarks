@@ -57,6 +57,19 @@ There is no agent token-issuance route and no agent post/media deletion route. C
 
 Use `docs/examples/draft.json` as a starting point. Get an uploaded media ID from the upload response and add it to `coverId`, `showcaseMediaIds`, `collections`, `progress`, run `resultMediaIds`, or media references. A published post requires a still-image cover. Set `status: "draft"` while collecting results. Do not invent elapsed time, tokens or cost: use `null` or omit optional values.
 
+Post-level work metadata sits below **Short description** in the owner editor and is accepted by both the authoring API and reusable connector. All fields are optional:
+
+| Editor label | JSON field | Value |
+| --- | --- | --- |
+| Provider | `provider` | `OpenAI`, `Google`, `Anthropic`, `Other`, or `null`. |
+| Model | `model` | Free text, at most 120 characters; blank is valid. |
+| Reasoning | `reasoningEffort` | Free text, at most 80 characters; blank is valid. |
+| Token Count | `tokens` | Nonnegative integer or `null`. |
+| Time | `elapsedSeconds` | Nonnegative integer seconds, at most 31,536,000, or `null`. |
+| Cost | `estimatedCostUsd` | Nonnegative USD amount, at most 1,000,000, or `null`. |
+
+`customProvider` is optional free text of up to 80 characters for `Other`; leaving it blank displays Other. Unknown numeric values use `null`; recorded zero stays visible. On edit, omitted metadata keys preserve their existing values. To clear a text field send `""`; to clear provider or a number send `null`. These fields describe the work in the post without creating a run. When all post metadata fields are absent, public display and share previews may show the first recorded legacy run. Any explicitly supplied post metadata, including blank fields, takes precedence without changing existing runs. Published share previews show only populated metadata, title, cover and a bounded summary; the original prompt is never embedded.
+
 Each run has a free-text `model` and `reasoningEffort`. Provider is `OpenAI`, `Google`, `Anthropic`, `Other`, or `null` when not recorded. `Other` requires a nonempty `customProvider`; other choices require it to be empty. Original prompts allow 100,000 characters. The total JSON request still must fit 512 KiB.
 
 `references` is an ordered array of at most 50 items:

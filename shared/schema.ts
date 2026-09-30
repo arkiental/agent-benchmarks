@@ -23,6 +23,16 @@ export const renderCollectionSchema = z.object({
   title: z.string().trim().min(1).max(120),
   mediaIds: z.array(idSchema).max(renderCollectionLimits.maxImages).refine(ids => new Set(ids).size === ids.length, 'Select each collection image once.'),
 }).strict();
+export const postMetadataFields = ['provider', 'customProvider', 'model', 'reasoningEffort', 'tokens', 'elapsedSeconds', 'estimatedCostUsd'] as const;
+export const postMetadataSchema = z.object({
+  provider: z.enum(providers).nullable().optional().describe('Optional provider for the work in this post.'),
+  customProvider: z.string().trim().max(80).optional().describe('Optional custom name when provider is Other.'),
+  model: z.string().trim().max(120).optional().describe('Optional free-text model for this post; blank is valid.'),
+  reasoningEffort: z.string().trim().max(80).optional().describe('Optional free-text reasoning setting; blank is valid.'),
+  tokens: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable().optional().describe('Optional recorded token count; null is unknown and zero is a recorded value.'),
+  elapsedSeconds: elapsed.optional().describe('Optional recorded elapsed time in seconds; null is unknown and zero is a recorded value.'),
+  estimatedCostUsd: z.number().min(0).max(1000000).nullable().optional().describe('Optional estimated cost in USD; null is unknown and zero is a recorded value.'),
+}).strict();
 export const runSchema = z.object({
   id: idSchema.optional(),
   model: z.string().trim().min(1).max(120),
@@ -43,6 +53,7 @@ export const postSchema = z.object({
   title: z.string().trim().min(3).max(160),
   slug: z.string().min(3).max(180).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   summary: z.string().trim().max(320),
+  ...postMetadataSchema.shape,
   category: z.enum(categories),
   prompt: z.string().min(1).max(100000),
   body: z.string().max(30000),
@@ -76,6 +87,7 @@ export const postSchema = z.object({
     if (run.provider !== 'Other' && run.customProvider?.trim()) ctx.addIssue({ code: 'custom', path: ['runs', index, 'customProvider'], message: 'Choose Other for a custom provider.' });
   });
 });
+export type PostMetadata = z.infer<typeof postMetadataSchema>;
 export type PostInput = z.infer<typeof postSchema>;
 export type RunInput = z.infer<typeof runSchema>;
 export type Reference = z.infer<typeof referenceSchema>;
@@ -84,12 +96,17 @@ export type GroupInput = z.infer<typeof groupSchema>;
 export type Media = { id: string; name: string; kind: 'image' | 'video'; durationSeconds: number | null; width: number; height: number; bytes: number; url: string; thumbnailUrl: string; createdAt: string };
 export type Run = Omit<RunInput, 'id'> & { id: string };
 export type Post = Omit<PostInput, 'revision' | 'runs' | 'showcaseMediaIds' | 'collections' | 'references' | 'groupId'> & { id: string; revision: number; runs: Run[]; showcaseMediaIds: string[]; collections: RenderCollection[]; references: Reference[]; groupId: string | null; group: ComparisonGroup | null; createdAt: string; updatedAt: string; publishedAt: string | null; media: Record<string, Media> };
-export type PostSummary = Pick<Post, 'id' | 'title' | 'slug' | 'summary' | 'category' | 'status' | 'isDemo' | 'coverId' | 'publishedAt' | 'updatedAt' | 'revision' | 'groupId'> & { cover: Media | null; models: string[]; providers: string[]; reasoningEfforts: string[]; runCount: number };
+export type PostSummary = Pick<Post, 'id' | 'title' | 'slug' | 'summary' | 'category' | 'status' | 'isDemo' | 'coverId' | 'publishedAt' | 'updatedAt' | 'revision' | 'groupId' | keyof PostMetadata> & { cover: Media | null; models: string[]; providers: string[]; reasoningEfforts: string[]; runCount: number };
 export type ComparisonGroup = { id: string; title: string; allowSideBySide: boolean; revision: number; posts: PostSummary[] };
 export type Comparison = Run & { postId: string; postTitle: string; slug: string; category: string; isDemo: boolean; cover: Media | null; resultImages: Media[]; groupId: string | null; canCompare: boolean };
 
 export function providerLabel(run: Pick<RunInput, 'provider' | 'customProvider'>): string {
   return run.provider === 'Other' ? run.customProvider || 'Other' : run.provider || '';
+}
+
+export function postMetadata(post: PostMetadata & { runs?: RunInput[] }): PostMetadata {
+  const source: PostMetadata = postMetadataFields.some(key => post[key] !== undefined) ? post : post.runs?.[0] || {};
+  return Object.fromEntries(postMetadataFields.flatMap(key => source[key] === undefined ? [] : [[key, source[key]]])) as PostMetadata;
 }
 
 export function duration(seconds: number | null): string {

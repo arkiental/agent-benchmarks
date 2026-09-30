@@ -1,10 +1,10 @@
 # Saved-token benchmark connector
 
-This local Windows MCP server exposes benchmark post search/read, draft creation, revision-checked editing, explicit publication, media listing and uploads from explicitly named files. Post inputs include render collections, final/progress galleries, references and recorded run metadata. It exposes no token creation, credential export, arbitrary HTTP request, shell, database or computer-access tool.
+This local Windows MCP server exposes benchmark post search/read, draft creation, revision-checked editing, explicit publication, comparison groups, media listing and uploads from explicitly named files. Post inputs include optional post-level Provider, Model, Reasoning, Token Count, Time in seconds and Cost in USD, render collections, final/progress galleries, references and recorded run metadata. Blank metrics stay unknown; zero is a recorded value. It exposes no token creation, credential export, arbitrary HTTP request, shell, database or computer-access tool.
 
 ## One-time owner setup
 
-In the signed-in owner page at https://bench.arkiental.com/admin/agents, issue or reuse a valid token with **Read posts**, **Create and edit drafts**, **Upload media** and, for requested publication, **Publish posts**. Comparison-group permission is unnecessary. Choose an expiry of 1–90 days. Existing expiry and revocation stay in force; the connector cannot renew or create credentials.
+In the signed-in owner page at https://bench.arkiental.com/admin/agents, issue or reuse a valid token with **Read posts**, **Create and edit drafts**, **Upload media** and, for requested publication, **Publish posts**. Comparison-group edits additionally require the owner-issued **Manage comparison groups** grant. Choose an expiry of 1-90 days. Existing expiry and revocation stay in force; the connector cannot renew or create credentials.
 
 Run this yourself in a private PowerShell terminal:
 
@@ -36,8 +36,10 @@ The connector accepts one explicit absolute PNG/JPEG/WebP/MP4 path within these 
 | `bench_update_post` | Full replacement using the current revision, preserving unrelated fields. Published edits require `confirmPublishedChange` and enabled publish scope. |
 | `bench_publish_post` | Separate publication operation for an explicitly requested post, with revision and idempotency key. |
 | `bench_list_media`, `bench_upload_media` | Authorized catalog and exactly one owner-approved local file per upload. |
+| `bench_list_groups`, `bench_get_group` | Ordered comparison groups, complete membership and current revision. |
+| `bench_create_group`, `bench_update_group` | Requested group membership and side-by-side setting, checked against the actual server-issued `groups:write` grant. Published membership requires `confirmPublishedChange` and locally enabled publication; edits require the current group revision. |
 
-Fetch a full post before editing. Preserve its prompt, statistics, collections and other galleries, strip response-only fields using `bench_schema`, and submit the fetched revision. Reuse the same idempotency key for an identical write retry within the API's 24-hour replay window. A different request or stale revision returns 409; stop and refetch. After an uncertain upload, do not blindly create a new key or repeat beyond the replay window.
+Fetch a full post before editing. Preserve its prompt, statistics, collections and other galleries, strip response-only fields using `bench_schema`, and submit the fetched revision. Create a draft before associating it with a group. Read the group before editing, preserve unrelated members and submit its current revision. Group tools use only the existing token's server-verified grant; they do not change the saved credential. Reuse the same idempotency key for an identical write retry within the API's 24-hour replay window. A different request or stale revision returns 409; stop and refetch. After an uncertain upload, do not blindly create a new key or repeat beyond the replay window.
 
 Setup checks scopes and expiry; each API operation still checks the real token's scope, expiry and revocation. Remove access in the owner Agent tokens page. To forget only the local encrypted copy:
 

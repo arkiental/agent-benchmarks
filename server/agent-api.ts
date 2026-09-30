@@ -42,7 +42,7 @@ groupJson.allOf = [{ properties: { postIds: { uniqueItems: true } } }];
 export const authoringSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   title: 'Agent Benchmarks authoring requests',
-  description: 'Version 1 full replacement requests. PUT requires the latest revision. Publication requires a still-image cover and publish scope. Custom providers require provider Other and customProvider. Reference links must be HTTP(S) without embedded credentials. Render collections contain ordered still-image IDs; omit collections on edit to preserve existing collections.',
+  description: 'Version 1 full replacement requests. PUT requires the latest revision. Publication requires a still-image cover and publish scope. Post-level provider, model, reasoningEffort, tokens, elapsedSeconds and estimatedCostUsd are optional; zero is a recorded value and omitted fields preserve stored post metadata on edit. Run custom providers require provider Other and customProvider. Reference links must be HTTP(S) without embedded credentials. Render collections contain ordered still-image IDs; omit collections on edit to preserve existing collections.',
   oneOf: [{ $ref: '#/$defs/Post' }, { $ref: '#/$defs/Group' }],
   $defs: {
     Post: postJson,

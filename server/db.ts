@@ -2,10 +2,10 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { providerLabel } from '../shared/schema.js';
-import type { Post, PostInput, Media, Run, PostSummary, GroupInput, ComparisonGroup } from '../shared/schema.js';
+import { providerLabel, postMetadata, postMetadataFields } from '../shared/schema.js';
+import type { Post, PostInput, Media, Run, PostSummary, GroupInput, ComparisonGroup, PostMetadata } from '../shared/schema.js';
 
-export type PostRow = { id: string; title: string; slug: string; summary: string; category: Post['category']; prompt: string; body: string; status: Post['status']; is_demo: number; cover_id: string | null; progress_json: string; showcase_json: string; collections_json: string; references_json: string; group_id: string | null; revision: number; created_at: string; updated_at: string; published_at: string | null };
+export type PostRow = { id: string; title: string; slug: string; summary: string; category: Post['category']; prompt: string; body: string; status: Post['status']; is_demo: number; cover_id: string | null; progress_json: string; showcase_json: string; collections_json: string; work_metadata_json: string; references_json: string; group_id: string | null; revision: number; created_at: string; updated_at: string; published_at: string | null };
 export type GroupRow = { id: string; title: string; allow_side_by_side: number; revision: number; created_at: string; updated_at: string };
 export type MediaRow = { id: string; name: string; kind: 'image' | 'video'; duration_seconds: number | null; width: number; height: number; bytes: number; created_at: string; filename: string; thumb_filename: string };
 export class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
@@ -26,7 +26,7 @@ export class Store {
   }
   migrate() {
     const version = this.db.pragma('user_version', { simple: true }) as number;
-    if (version > 4) throw new Error('Database is newer than this application. Restore a compatible application version.');
+    if (version > 5) throw new Error('Database is newer than this application. Restore a compatible application version.');
     if (version === 0) this.db.transaction(() => {
       this.db.exec(`
         CREATE TABLE posts (
@@ -81,6 +81,10 @@ export class Store {
       this.db.exec(`ALTER TABLE posts ADD COLUMN collections_json TEXT NOT NULL DEFAULT '[]';
         PRAGMA user_version = 4;`);
     })();
+    if (version < 5) this.db.transaction(() => {
+      this.db.exec(`ALTER TABLE posts ADD COLUMN work_metadata_json TEXT NOT NULL DEFAULT '{}';
+        PRAGMA user_version = 5;`);
+    })();
   }
   getPost(id: string): PostRow | undefined { return this.db.prepare('SELECT * FROM posts WHERE id=?').get(id) as PostRow | undefined; }
   getMedia(id: string): MediaRow | undefined { return this.db.prepare('SELECT * FROM media WHERE id=?').get(id) as MediaRow | undefined; }
@@ -92,9 +96,11 @@ export class Store {
   summary(row: PostRow): PostSummary {
     const cover = row.cover_id ? this.getMedia(row.cover_id) : undefined;
     const runs = this.runs(row.id);
-    return { id: row.id, title: row.title, slug: row.slug, summary: row.summary, category: row.category, status: row.status,
+    const metadata = JSON.parse(row.work_metadata_json) as PostMetadata;
+    const effective = postMetadata({ ...metadata, runs });
+    return { ...metadata, id: row.id, title: row.title, slug: row.slug, summary: row.summary, category: row.category, status: row.status,
       isDemo: Boolean(row.is_demo), coverId: row.cover_id, cover: cover ? this.media(cover) : null,
-      publishedAt: row.published_at, updatedAt: row.updated_at, revision: row.revision, groupId: row.group_id, models: [...new Set(runs.map(run => run.model))], providers: [...new Set(runs.map(providerLabel).filter(Boolean))], reasoningEfforts: [...new Set(runs.map(run => run.reasoningEffort || '').filter(Boolean))], runCount: runs.length };
+      publishedAt: row.published_at, updatedAt: row.updated_at, revision: row.revision, groupId: row.group_id, models: [...new Set([effective.model, ...runs.map(run => run.model)].filter((value): value is string => Boolean(value)))], providers: [...new Set([providerLabel(effective), ...runs.map(providerLabel)].filter(Boolean))], reasoningEfforts: [...new Set([effective.reasoningEffort, ...runs.map(run => run.reasoningEffort || '')].filter((value): value is string => Boolean(value)))], runCount: runs.length };
   }
   post(row: PostRow, includeDrafts = false): Post {
     const mediaRows = this.db.prepare('SELECT media.* FROM media JOIN post_media ON media.id=post_media.media_id WHERE post_media.post_id=?').all(row.id) as MediaRow[];
@@ -108,6 +114,7 @@ export class Store {
       if (existing && input.revision !== existing.revision) throw new HttpError(409, 'This post changed in another window. Reload it before saving.');
       const duplicate = this.db.prepare('SELECT id FROM posts WHERE slug=? AND id<>?').get(input.slug, id);
       if (duplicate) throw new HttpError(409, 'That URL is already in use. Choose another.');
+      const metadata = { ...(existing ? JSON.parse(existing.work_metadata_json) as PostMetadata : {}), ...Object.fromEntries(postMetadataFields.flatMap(key => input[key] === undefined ? [] : [[key, input[key]]])) };
       const collections = input.collections ?? (existing ? JSON.parse(existing.collections_json) as Post['collections'] : []);
       const references = input.references ?? (existing ? JSON.parse(existing.references_json) as Post['references'] : []);
       const groupId = input.groupId === undefined ? existing?.group_id || null : input.groupId;
@@ -121,12 +128,12 @@ export class Store {
       if (input.coverId && this.getMedia(input.coverId)?.kind !== 'image') throw new HttpError(400, 'Choose a still image for the cover. Videos belong in the galleries.');
       const now = new Date().toISOString();
       const publishedAt = input.status === 'published' ? existing?.published_at || now : existing?.published_at || null;
-      this.db.prepare(`INSERT INTO posts (id,title,slug,summary,category,prompt,body,status,is_demo,cover_id,progress_json,showcase_json,collections_json,references_json,group_id,revision,created_at,updated_at,published_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,slug=excluded.slug,summary=excluded.summary,
+      this.db.prepare(`INSERT INTO posts (id,title,slug,summary,category,prompt,body,status,is_demo,cover_id,progress_json,showcase_json,collections_json,work_metadata_json,references_json,group_id,revision,created_at,updated_at,published_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,slug=excluded.slug,summary=excluded.summary,
         category=excluded.category,prompt=excluded.prompt,body=excluded.body,status=excluded.status,is_demo=excluded.is_demo,cover_id=excluded.cover_id,
-        progress_json=excluded.progress_json,showcase_json=excluded.showcase_json,collections_json=excluded.collections_json,references_json=excluded.references_json,group_id=excluded.group_id,revision=excluded.revision,updated_at=excluded.updated_at,published_at=excluded.published_at`).run(
+        progress_json=excluded.progress_json,showcase_json=excluded.showcase_json,collections_json=excluded.collections_json,work_metadata_json=excluded.work_metadata_json,references_json=excluded.references_json,group_id=excluded.group_id,revision=excluded.revision,updated_at=excluded.updated_at,published_at=excluded.published_at`).run(
         id,input.title,input.slug,input.summary,input.category,input.prompt,input.body,input.status,Number(input.isDemo),input.coverId,
-        JSON.stringify(input.progress),JSON.stringify(input.showcaseMediaIds || []),JSON.stringify(collections),JSON.stringify(references),groupId,(existing?.revision || 0)+1,existing?.created_at || now,now,publishedAt);
+        JSON.stringify(input.progress),JSON.stringify(input.showcaseMediaIds || []),JSON.stringify(collections),JSON.stringify(metadata),JSON.stringify(references),groupId,(existing?.revision || 0)+1,existing?.created_at || now,now,publishedAt);
       if (groupId !== (existing?.group_id || null)) {
         for (const changedGroup of new Set([groupId, existing?.group_id].filter(Boolean))) this.db.prepare('UPDATE comparison_groups SET revision=revision+1,updated_at=? WHERE id=?').run(now, changedGroup);
       }
